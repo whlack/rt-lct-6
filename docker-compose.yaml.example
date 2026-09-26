@@ -1,0 +1,130 @@
+name: rt-crm
+
+x-backend-image: &backend-image rt-crm-backend:local
+x-database-url: &database-url postgresql://${CRM_DB_USER}:${CRM_DB_PASSWORD}@postgres:5432/${CRM_DB}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      CRM_DB: ${CRM_DB:?}
+      CRM_DB_USER: ${CRM_DB_USER:?}
+      CRM_DB_PASSWORD: ${CRM_DB_PASSWORD:?}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:?}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/01-create-databases.sh:/docker-entrypoint-initdb.d/01-create-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:?}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:?}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./infra/keycloak/realm.json:/opt/keycloak/data/import/realm.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: [data, web]
+
+  backend:
+    image: *backend-image
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: development
+    environment:
+      DATABASE_URL: *database-url
+      PORT: 3000
+    volumes:
+      - ./backend:/workspace/backend
+      - backend_node_modules:/workspace/backend/node_modules
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [data, web]
+
+  frontend:
+    image: rt-crm-frontend:local
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+    volumes:
+      - ./frontend:/workspace/frontend
+      - frontend_node_modules:/workspace/frontend/node_modules
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [web]
+
+  migrate:
+    profiles: [migration]
+    image: *backend-image
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: development
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      - ./backend:/workspace/backend
+      - backend_node_modules:/workspace/backend/node_modules
+    working_dir: /workspace/backend
+    command: ["sh", "-ec", "pnpm prisma migrate deploy && pnpm prisma db seed"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [data]
+
+networks:
+  data:
+  web:
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_node_modules:
+  frontend_node_modules:

@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0"
+  },
+  "scripts": {
+    "dev": "prisma generate && tsx watch src/main.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start:prod": "node dist/main.js",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "lint": "eslint src prisma prisma.config.ts",
+    "test": "node --import tsx --test src/modules/status/services/status.service.test.ts",
+    "prisma:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/swagger": "^11.2.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "pg": "^8.16.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
+    "eslint": "^9.34.0",
+    "prisma": "7.10.0",
+    "tsx": "^4.20.5",
+    "typescript-eslint": "^8.41.0"
+  }
+}

@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+backend/src/generated/
+dist/
+node_modules/
+.idea/

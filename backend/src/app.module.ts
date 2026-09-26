@@ -1,0 +1,5 @@
+import { Module } from '@nestjs/common';
+import { StatusModule } from './modules/status/status.module.js';
+
+@Module({ imports: [StatusModule] })
+export class AppModule {}

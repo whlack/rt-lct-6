@@ -1,0 +1,12 @@
+{
+  "realm": "crm",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "kam", "description": "КАМ, уровень 10" },
+      { "name": "supervisor", "description": "Руководитель КАМ, уровень 20" },
+      { "name": "admin", "description": "Администратор CRM, уровень 30" }
+    ]
+  },
+  "users": []
+}

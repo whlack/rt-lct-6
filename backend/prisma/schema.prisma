@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  String   @id @default(uuid()) @db.Uuid
+  keycloakSubject     String   @unique @map("keycloak_subject")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Permission {
+  id           String @id @default(uuid()) @db.Uuid
+  key          String @unique
+  minimumLevel Int    @map("minimum_level")
+
+  @@map("permissions")
+}
