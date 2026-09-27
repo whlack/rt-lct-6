@@ -8,9 +8,19 @@ datasource db {
 }
 
 model User {
-  id                  String   @id @default(uuid()) @db.Uuid
-  keycloakSubject     String   @unique @map("keycloak_subject")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id              String                 @id @default(uuid()) @db.Uuid
+  keycloakSubject String                 @unique @map("keycloak_subject")
+  displayName     String?                @map("display_name")
+  email           String?
+  createdAt       DateTime               @default(now()) @map("created_at")
+  universities    University[]           @relation("UniversityCreator")
+  assignments     UniversityAssignment[]
+  projectsCreated Project[]              @relation("ProjectCreator")
+  projectsOwned   Project[]              @relation("ProjectResponsible")
+  projectsLed     Project[]              @relation("ProjectSupervisor")
+  comments        ProjectComment[]
+  files           ProjectFile[]
+  events          ProjectEvent[]
 
   @@map("users")
 }
@@ -21,4 +31,205 @@ model Permission {
   minimumLevel Int    @map("minimum_level")
 
   @@map("permissions")
+}
+
+model Direction {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  projects  Project[]
+
+  @@map("directions")
+}
+
+model Program {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  projects  Project[]
+
+  @@map("programs")
+}
+
+model Product {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  projects  Project[]
+
+  @@map("products")
+}
+
+model University {
+  id               String                 @id @default(uuid()) @db.Uuid
+  name             String                 @unique
+  primaryContactId String?                @map("primary_contact_id") @db.Uuid
+  primaryContact   UniversityContact?     @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  contacts         UniversityContact[]    @relation("UniversityContacts")
+  assignments      UniversityAssignment[]
+  projects         Project[]
+  createdById      String                 @map("created_by_id") @db.Uuid
+  createdBy        User                   @relation("UniversityCreator", fields: [createdById], references: [id])
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@map("universities")
+}
+
+model UniversityContact {
+  id             String       @id @default(uuid()) @db.Uuid
+  universityId   String       @map("university_id") @db.Uuid
+  university     University   @relation("UniversityContacts", fields: [universityId], references: [id], onDelete: Cascade)
+  primaryFor     University[] @relation("PrimaryContact")
+  expectedStages ProjectStage[]
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  @@index([universityId])
+  @@map("university_contacts")
+}
+
+model UniversityAssignment {
+  universityId String     @map("university_id") @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([universityId, userId])
+  @@map("university_assignments")
+}
+
+enum TransferStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ExpectedActor {
+  KAM
+  UNIVERSITY
+}
+
+enum FileStatus {
+  ATTACHED
+  COMPLETED
+}
+
+model Project {
+  id                 String           @id @default(uuid()) @db.Uuid
+  universityId       String           @map("university_id") @db.Uuid
+  university         University       @relation(fields: [universityId], references: [id])
+  directionId        String           @map("direction_id") @db.Uuid
+  direction          Direction        @relation(fields: [directionId], references: [id])
+  programId          String?          @map("program_id") @db.Uuid
+  program            Program?         @relation(fields: [programId], references: [id], onDelete: Restrict)
+  productId          String?          @map("product_id") @db.Uuid
+  product            Product?         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  responsibleId      String           @map("responsible_id") @db.Uuid
+  responsible        User             @relation("ProjectResponsible", fields: [responsibleId], references: [id])
+  supervisorId       String?          @map("supervisor_id") @db.Uuid
+  supervisor         User?            @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  createdById        String           @map("created_by_id") @db.Uuid
+  createdBy          User             @relation("ProjectCreator", fields: [createdById], references: [id])
+  vendor             String?
+  contractNumber     String?          @map("contract_number")
+  licenseSignedAt    DateTime?        @map("license_signed_at") @db.Date
+  licenseExpiresYear Int?             @map("license_expires_year")
+  transferStatus     TransferStatus   @default(NOT_STARTED) @map("transfer_status")
+  currentStageIndex  Int              @default(0) @map("current_stage_index")
+  workflowLocked     Boolean          @default(false) @map("workflow_locked")
+  closedAt           DateTime?        @map("closed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  stages             ProjectStage[]
+  comments           ProjectComment[]
+  events             ProjectEvent[]
+
+  @@index([universityId])
+  @@index([responsibleId])
+  @@map("projects")
+}
+
+model ProjectStage {
+  id                String             @id @default(uuid()) @db.Uuid
+  projectId         String             @map("project_id") @db.Uuid
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  position          Int
+  title             String
+  expectedActor     ExpectedActor      @default(KAM) @map("expected_actor")
+  expectedContactId String?            @map("expected_contact_id") @db.Uuid
+  expectedContact   UniversityContact? @relation(fields: [expectedContactId], references: [id])
+  documentTypes     StageDocumentType[]
+  files             ProjectFile[]
+
+  @@unique([projectId, position])
+  @@map("project_stages")
+}
+
+model StageDocumentType {
+  id         String        @id @default(uuid()) @db.Uuid
+  stageId    String        @map("stage_id") @db.Uuid
+  stage      ProjectStage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  name       String
+  isRequired Boolean       @default(false) @map("is_required")
+  files      ProjectFile[]
+
+  @@unique([stageId, name])
+  @@map("stage_document_types")
+}
+
+model ProjectFile {
+  id             String            @id @default(uuid()) @db.Uuid
+  stageId        String            @map("stage_id") @db.Uuid
+  stage          ProjectStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  documentTypeId String            @map("document_type_id") @db.Uuid
+  documentType   StageDocumentType @relation(fields: [documentTypeId], references: [id])
+  storageKey     String            @unique @map("storage_key")
+  fileName       String            @map("file_name")
+  mimeType       String            @map("mime_type")
+  size           Int
+  status         FileStatus        @default(ATTACHED)
+  uploadedById   String            @map("uploaded_by_id") @db.Uuid
+  uploadedBy     User              @relation(fields: [uploadedById], references: [id])
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([stageId])
+  @@map("project_files")
+}
+
+model ProjectComment {
+  id        String           @id @default(uuid()) @db.Uuid
+  projectId String           @map("project_id") @db.Uuid
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId  String?          @map("parent_id") @db.Uuid
+  parent    ProjectComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   ProjectComment[] @relation("CommentReplies")
+  authorId  String           @map("author_id") @db.Uuid
+  author    User             @relation(fields: [authorId], references: [id])
+  body      String
+  deletedAt DateTime?        @map("deleted_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("project_comments")
+}
+
+model ProjectEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId    String   @map("actor_id") @db.Uuid
+  actor      User     @relation(fields: [actorId], references: [id])
+  type       String
+  objectType String   @map("object_type")
+  objectId   String   @map("object_id") @db.Uuid
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@map("project_events")
 }

@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": ["node", "multer"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"]

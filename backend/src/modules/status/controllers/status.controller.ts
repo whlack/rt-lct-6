@@ -12,6 +12,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { StatusService } from '../services/status.service.js';
+import { Public } from '../../auth/decorators/public.decorator.js';
 
 @ApiTags('status')
 @Controller('api')
@@ -19,6 +20,7 @@ export class StatusController {
   constructor(@Inject(StatusService) private readonly status: StatusService) {}
 
   @Get('health')
+  @Public()
   @ApiOperation({ summary: 'Process liveness' })
   @ApiOkResponse({ schema: { example: { status: 'ok' } } })
   health(): { status: 'ok' } {
@@ -26,6 +28,7 @@ export class StatusController {
   }
 
   @Get('ready')
+  @Public()
   @ApiOperation({ summary: 'Database readiness' })
   @ApiOkResponse({ schema: { example: { status: 'ok' } } })
   @ApiServiceUnavailableResponse({ description: 'Database is unavailable' })
