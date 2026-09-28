@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -36,6 +37,27 @@ export class S3Adapter {
     );
     if (!result.Body) throw new Error('Stored file has no body');
     return result.Body.transformToByteArray();
+  }
+
+  async *oldTemporaryKeys(before: Date) {
+    // A process may die after upload but before committing the object reference.
+    // Restrict orphan cleanup to our temporary prefixes, never project documents.
+    for (const prefix of ['exports/', 'imports/']) {
+      let cursor: string | undefined;
+      do {
+        const page = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+            ContinuationToken: cursor,
+          }),
+        );
+        for (const object of page.Contents ?? [])
+          if (object.Key && object.LastModified && object.LastModified < before)
+            yield object.Key;
+        cursor = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (cursor);
+    }
   }
 
   delete(key: string) {

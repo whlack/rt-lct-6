@@ -107,7 +107,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: development
-    environment:
+    environment: &backend-env
       DATABASE_URL: *database-url
       PORT: 3000
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?}
@@ -124,6 +124,15 @@ services:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REPORT_TIMEZONE: ${REPORT_TIMEZONE:-Europe/Moscow}
+      JOB_RETENTION_HOURS: ${JOB_RETENTION_HOURS:-24}
+      EXPORT_CONCURRENCY: ${EXPORT_CONCURRENCY:-2}
+      IMPORT_CONCURRENCY: ${IMPORT_CONCURRENCY:-1}
+      REPORT_MAX_PROJECTS: ${REPORT_MAX_PROJECTS:-50000}
+      IMPORT_MAX_BYTES: ${IMPORT_MAX_BYTES:-10485760}
+      IMPORT_MAX_ROWS: ${IMPORT_MAX_ROWS:-20000}
+      IMPORT_MAX_UNCOMPRESSED_BYTES: ${IMPORT_MAX_UNCOMPRESSED_BYTES:-52428800}
     volumes:
       - ./backend/src:/workspace/backend/src
       - ./backend/prisma:/workspace/backend/prisma
@@ -139,6 +148,32 @@ services:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
+      retries: 20
+    networks: [data, web]
+
+  worker:
+    image: rt-crm-worker:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: worker-development
+    environment: *backend-env
+    init: true
+    stop_grace_period: 120s
+    mem_limit: 2g
+    cpus: "2"
+    volumes:
+      - ./backend/src:/workspace/backend/src
+      - ./backend/prisma:/workspace/backend/prisma
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      keycloak-config: { condition: service_completed_successfully }
+      minio-setup: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
       retries: 20
     networks: [data, web]
 
