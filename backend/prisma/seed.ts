@@ -11,6 +11,10 @@ const prisma = new PrismaClient({
 });
 
 const permissions = [
+  ['dashboard.read', 10],
+  ['reports.read', 20],
+  ['reports.export', 20],
+  ['statistics.read', 20],
   ['universities.read', 10],
   ['universities.create', 10],
   ['universities.update', 10],

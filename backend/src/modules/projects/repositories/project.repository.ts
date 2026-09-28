@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { DatabaseService } from '../../../database/database.service.js';
 import type { AuthUser } from '../../auth/index.js';
+import { projectScope } from '../project-scope.js';
 
 const projectInclude = {
   university: { select: { id: true, name: true } },
@@ -128,15 +129,7 @@ export class ProjectRepository {
 
   list(user: AuthUser) {
     return this.database.prisma.project.findMany({
-      where:
-        user.level >= 20
-          ? {}
-          : {
-              OR: [
-                { responsibleId: user.id },
-                { university: { assignments: { some: { userId: user.id } } } },
-              ],
-            },
+      where: projectScope(user),
       include: projectInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -151,16 +144,7 @@ export class ProjectRepository {
 
   findVisible(user: AuthUser, id: string): Promise<ProjectView | null> {
     return this.database.prisma.project.findFirst({
-      where:
-        user.level >= 20
-          ? { id }
-          : {
-              id,
-              OR: [
-                { responsibleId: user.id },
-                { university: { assignments: { some: { userId: user.id } } } },
-              ],
-            },
+      where: { AND: [{ id }, projectScope(user)] },
       include: projectInclude,
     });
   }

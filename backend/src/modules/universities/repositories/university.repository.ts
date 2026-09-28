@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service.js';
 import type { AuthUser } from '../../auth/index.js';
+import { universityScope } from '../university-scope.js';
 
 @Injectable()
 export class UniversityRepository {
@@ -10,8 +11,7 @@ export class UniversityRepository {
 
   list(user: AuthUser) {
     return this.database.prisma.university.findMany({
-      where:
-        user.level >= 20 ? {} : { assignments: { some: { userId: user.id } } },
+      where: universityScope(user),
       select: { id: true, name: true, primaryContactId: true, createdAt: true },
       orderBy: { name: 'asc' },
     });
