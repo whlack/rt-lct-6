@@ -239,6 +239,7 @@ model ProjectEvent {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([projectId, createdAt])
+  @@index([createdAt, projectId])
   @@map("project_events")
 }
 

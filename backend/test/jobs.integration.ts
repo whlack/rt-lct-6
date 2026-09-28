@@ -4,11 +4,17 @@ import { test } from 'node:test';
 import { DatabaseService } from '../src/database/database.service.js';
 import { JobsRepository } from '../src/modules/jobs/index.js';
 import { JobsService } from '../src/modules/jobs/services/jobs.service.js';
+import { PermissionService } from '../src/modules/permissions/services/permission.service.js';
+import { PermissionRepository } from '../src/modules/permissions/repositories/permission.repository.js';
 
 test('leases have one owner, committed exports retain scope and retry is idempotent', async () => {
   const db = new DatabaseService();
   const repo = new JobsRepository(db);
   const suffix = randomUUID();
+  const permissionKey = 'test.jobs.' + suffix;
+  await db.prisma.permission.create({
+    data: { key: permissionKey, minimumLevel: 10 },
+  });
   let userId: string | undefined,
     universityId: string | undefined,
     projectId: string | undefined,
@@ -43,7 +49,7 @@ test('leases have one owner, committed exports retain scope and retry is idempot
     const job = await repo.createExport(userId, {
       kind: 'SUMMARY',
       format: 'xlsx',
-      permission: 'reports.export',
+      permission: permissionKey,
       parameters: {},
     });
     jobId = job.id;
@@ -92,7 +98,7 @@ test('leases have one owner, committed exports retain scope and retry is idempot
     const service = new JobsService(
       repo,
       { notify: async () => {} },
-      { require: async () => {} },
+      new PermissionService(new PermissionRepository(db)),
       {
         get: async () => {
           reads++;
@@ -103,6 +109,16 @@ test('leases have one owner, committed exports retain scope and retry is idempot
     );
     assert.equal((await service.file(actor, jobId)).bytes.toString(), 'result');
     assert.equal(reads, 1);
+    await db.prisma.permission.update({
+      where: { key: permissionKey },
+      data: { minimumLevel: 20 },
+    });
+    await assert.rejects(service.file(actor, jobId));
+    assert.equal(reads, 1);
+    await db.prisma.permission.update({
+      where: { key: permissionKey },
+      data: { minimumLevel: 10 },
+    });
     const replacement = await db.prisma.user.create({
       data: { keycloakSubject: 'replacement-' + suffix },
     });
@@ -208,6 +224,7 @@ test('leases have one owner, committed exports retain scope and retry is idempot
       await db.prisma.direction.delete({ where: { id: directionId } });
     if (programId) await db.prisma.program.delete({ where: { id: programId } });
     if (userId) await db.prisma.user.delete({ where: { id: userId } });
+    await db.prisma.permission.delete({ where: { key: permissionKey } });
     await db.onModuleDestroy();
   }
 });
