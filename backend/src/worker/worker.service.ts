@@ -18,6 +18,7 @@ import { ReportExportProcessor } from '../modules/reports/index.js';
 import { S3Adapter } from '../integrations/storage/s3.adapter.js';
 import { CleanupService } from '../modules/jobs/index.js';
 import { ImportProcessor } from '../modules/catalog-import/index.js';
+import { StatisticsService } from '../modules/statistics/index.js';
 import { errors, jobDuration, jobWait, retries } from '../common/metrics.js';
 
 @Injectable()
@@ -35,6 +36,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     @Inject(S3Adapter) private readonly storage: S3Adapter,
     @Inject(CleanupService) private readonly cleanup: CleanupService,
     @Inject(ImportProcessor) private readonly catalogImports: ImportProcessor,
+    @Inject(StatisticsService) private readonly statistics: StatisticsService,
   ) {}
   onModuleInit() {
     this.imports = new Worker(
@@ -147,7 +149,10 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         job.owner.keycloakSubject,
         job.permission,
       );
-      const result = await this.reports.run(job, user);
+      const result =
+        job.kind === 'STATISTICS'
+          ? await this.statistics.run(job, user)
+          : await this.reports.run(job, user);
       key = 'exports/' + id + '/' + executionId + '.' + job.format;
       await this.storage.put(key, result.bytes, result.mimeType);
       const committed = await this.jobs.completeExport(id, executionId, {

@@ -30,6 +30,17 @@ export function validateFilters(filters: ReportFiltersDto): void {
   if (filters.programId && filters.productId)
     throw new BadRequestException('Select program or product, not both');
 }
+export async function reportBounds(
+  tx: Prisma.TransactionClient,
+  dateFrom: string,
+  dateTo: string,
+) {
+  const [bounds] = await tx.$queryRaw<Array<{ start: Date; end: Date }>>`SELECT
+      ${dateFrom}::date::timestamp AT TIME ZONE ${reportTimezone()} AS start,
+      (${dateTo}::date + 1)::timestamp AT TIME ZONE ${reportTimezone()} AS "end"`;
+  return bounds;
+}
+
 export async function reportWhere(
   tx: Prisma.TransactionClient,
   user: AuthUser,
@@ -38,11 +49,7 @@ export async function reportWhere(
   validateFilters(filters);
   let events: Prisma.ProjectWhereInput = {};
   if (filters.dateFrom && filters.dateTo) {
-    const [bounds] = await tx.$queryRaw<
-      Array<{ start: Date; end: Date }>
-    >`SELECT
-      ${filters.dateFrom}::date::timestamp AT TIME ZONE ${reportTimezone()} AS start,
-      (${filters.dateTo}::date + 1)::timestamp AT TIME ZONE ${reportTimezone()} AS "end"`;
+    const bounds = await reportBounds(tx, filters.dateFrom, filters.dateTo);
     events = {
       events: { some: { createdAt: { gte: bounds.start, lt: bounds.end } } },
     };

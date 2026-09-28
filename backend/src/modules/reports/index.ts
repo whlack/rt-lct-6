@@ -8,6 +8,7 @@ export {
 export { ReportFiltersDto, ReportQueryDto } from './dto/report-query.dto.js';
 export {
   reportWhere,
+  reportBounds,
   reportTimezone,
   validateFilters,
 } from './report-filters.js';

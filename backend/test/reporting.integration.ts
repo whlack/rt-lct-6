@@ -5,6 +5,7 @@ import { DatabaseService } from '../src/database/database.service.js';
 import { DashboardRepository } from '../src/modules/dashboard/repositories/dashboard.repository.js';
 import { ReportRepository } from '../src/modules/reports/repositories/report.repository.js';
 import { ReportQueryDto } from '../src/modules/reports/index.js';
+import { StatisticsRepository } from '../src/modules/statistics/repositories/statistics.repository.js';
 
 test('scoped counters, local date boundaries, deduplication and safe detail reports', async () => {
   const db = new DatabaseService();
@@ -99,6 +100,41 @@ test('scoped counters, local date boundaries, deduplication and safe detail repo
     const result = await reports.list(actor, query);
     assert.equal(result.total, 3);
     assert.equal(new Set(result.rows.map((r) => r.id)).size, 3);
+    await db.prisma.project.update({
+      where: { id: projects[0] },
+      data: { createdAt: new Date('2026-03-31T21:00:00Z') },
+    });
+    await db.prisma.project.update({
+      where: { id: projects[3] },
+      data: { closedAt: new Date('2026-03-31T21:00:00Z') },
+    });
+    const unrelated = await db.prisma.project.create({
+      data: {
+        universityId: u1.id,
+        directionId,
+        programId,
+        responsibleId: owner.id,
+        createdById: owner.id,
+      },
+    });
+    projects.push(unrelated.id);
+    const statistics = await new StatisticsRepository(db).get(actor, {
+      dateFrom: '2026-04-01',
+      dateTo: '2026-04-01',
+    });
+    assert.equal(
+      statistics.data.status.active + statistics.data.status.closed,
+      result.total,
+    );
+    assert.equal(
+      statistics.data.directions.reduce((sum, item) => sum + item.count, 0),
+      result.total,
+    );
+    assert.equal(statistics.data.months.length, 1);
+    assert.equal(statistics.data.months[0].created, 1);
+    assert.equal(statistics.data.months[0].closed, 1);
+    assert.equal(statistics.projectIds.includes(unrelated.id), false);
+
     const outside = await reports.list(
       actor,
       Object.assign(new ReportQueryDto(), {
