@@ -5,6 +5,7 @@ import { AuthService } from './auth.service.js';
 test('requires a CRM role and maps the highest role level', async () => {
   let capturedProfile: { name?: string; email?: string } | undefined;
   const users = {
+    name: async () => undefined,
     ensure: async (
       _subject: string,
       profile?: { name?: string; email?: string },

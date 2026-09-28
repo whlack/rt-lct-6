@@ -1,3 +1,4 @@
+import { catalogName } from '../../../common/catalog-name.js';
 import {
   BadRequestException,
   ConflictException,
@@ -37,18 +38,18 @@ export class CatalogService {
   }
 
   async create(kind: string, name: string) {
-    if (!name.trim()) throw new BadRequestException('Name is required');
+    if (!catalogName(name)) throw new BadRequestException('Name is required');
     try {
-      return await this.repository.create(kindOf(kind), name.trim());
+      return await this.repository.create(kindOf(kind), catalogName(name));
     } catch (error) {
       handleCatalogError(error);
     }
   }
 
   async update(kind: string, id: string, name: string) {
-    if (!name.trim()) throw new BadRequestException('Name is required');
+    if (!catalogName(name)) throw new BadRequestException('Name is required');
     try {
-      return await this.repository.update(kindOf(kind), id, name.trim());
+      return await this.repository.update(kindOf(kind), id, catalogName(name));
     } catch (error) {
       handleCatalogError(error);
     }

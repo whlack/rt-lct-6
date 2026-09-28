@@ -17,11 +17,14 @@ import {
 import { ReportExportProcessor } from '../modules/reports/index.js';
 import { S3Adapter } from '../integrations/storage/s3.adapter.js';
 import { CleanupService } from '../modules/jobs/index.js';
+import { ImportProcessor } from '../modules/catalog-import/index.js';
+import { errors, jobDuration, jobWait, retries } from '../common/metrics.js';
 
 @Injectable()
 export class WorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WorkerService.name);
   private exports?: Worker;
+  private imports?: Worker;
   private cleanupTimer?: ReturnType<typeof setInterval>;
   constructor(
     @Inject(JobsRepository) private readonly jobs: JobsRepository,
@@ -31,8 +34,20 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly reports: ReportExportProcessor,
     @Inject(S3Adapter) private readonly storage: S3Adapter,
     @Inject(CleanupService) private readonly cleanup: CleanupService,
+    @Inject(ImportProcessor) private readonly catalogImports: ImportProcessor,
   ) {}
   onModuleInit() {
+    this.imports = new Worker(
+      'crm-imports',
+      (job) => this.process('import', job),
+      {
+        connection: redisConnection(),
+        concurrency: positiveInteger('IMPORT_CONCURRENCY', 1),
+      },
+    );
+    this.imports.on('error', () =>
+      this.logger.warn('IMPORT_QUEUE_UNAVAILABLE'),
+    );
     this.exports = new Worker(
       'crm-exports',
       (job) => this.process('export', job),
@@ -50,7 +65,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     this.cleanupTimer.unref();
   }
   async healthy() {
-    if (!this.exports?.isRunning()) return false;
+    if (!this.exports?.isRunning() || !this.imports?.isRunning()) return false;
     try {
       const result = await Promise.race([
         this.exports
@@ -74,13 +89,20 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     )
       throw new UnrecoverableError('INVALID_JOB');
     const id: string = task.data.id;
-    const executionId = await this.jobs.claim(kind, id);
-    if (!executionId) {
-      const current = await this.jobs.database.prisma.exportJob.findUnique({
+    const started = performance.now();
+    let outcome = 'SUCCEEDED';
+    if (kind === 'import') {
+      const input = await this.jobs.database.prisma.importJob.findUnique({
         where: { id },
       });
+      if (input && task.data.phase !== input.phase) return;
+    }
+    const executionId = await this.jobs.claim(kind, id);
+    if (!executionId) {
+      const current = await this.current(kind, id);
       if (
         current?.status === 'SUCCEEDED' ||
+        current?.status === 'PREVIEW' ||
         current?.status === 'EXPIRED' ||
         current?.status === 'FAILED'
       )
@@ -94,6 +116,29 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     }, 5000);
     let key: string | undefined;
     try {
+      const attempt = await this.current(kind, id);
+      if (attempt) {
+        jobWait.observe(
+          { kind },
+          Math.max(0, Date.now() - attempt.createdAt.getTime()) / 1000,
+        );
+        if (attempt.attempts > 1) retries.inc({ kind });
+      }
+      if (kind === 'import') {
+        const input =
+          await this.jobs.database.prisma.importJob.findUniqueOrThrow({
+            where: { id },
+            include: { owner: true },
+          });
+        if (task.data.phase !== input.phase) return;
+        const user = await this.identities.resolve(
+          input.owner.keycloakSubject,
+          'catalogs.import',
+        );
+        await this.catalogImports.run(input, executionId, user);
+        this.logger.log({ jobId: id, result: 'IMPORT_COMPLETED' });
+        return;
+      }
       const job = await this.jobs.database.prisma.exportJob.findUniqueOrThrow({
         where: { id },
         include: { owner: true },
@@ -131,9 +176,9 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
           ? 'INVALID_DATA'
           : 'ACCESS_UNAVAILABLE'
         : 'TEMPORARY_FAILURE';
-      const current = await this.jobs.database.prisma.exportJob.findUnique({
-        where: { id },
-      });
+      outcome = code;
+      errors.inc({ kind, code });
+      const current = await this.current(kind, id);
       await this.jobs.fail(
         kind,
         id,
@@ -147,10 +192,20 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
       throw new Error(code);
     } finally {
       clearInterval(heartbeat);
+      jobDuration.observe(
+        { kind, result: outcome },
+        (performance.now() - started) / 1000,
+      );
     }
   }
   async onModuleDestroy() {
     if (this.cleanupTimer) clearInterval(this.cleanupTimer);
     await this.exports?.close();
+    await this.imports?.close();
+  }
+  private current(kind: QueueKind, id: string) {
+    return kind === 'export'
+      ? this.jobs.database.prisma.exportJob.findUnique({ where: { id } })
+      : this.jobs.database.prisma.importJob.findUnique({ where: { id } });
   }
 }

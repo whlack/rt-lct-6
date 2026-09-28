@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service.js';
 import { Prisma } from '../../../generated/prisma/client.js';
-import type { AuthUser } from '../../auth/index.js';
+import { publicProfile, type AuthUser } from '../../auth/index.js';
 import { projectScope } from '../../projects/index.js';
 import { reportWhere } from '../report-filters.js';
 import type {
@@ -13,6 +13,7 @@ export const personSelect = {
   id: true,
   keycloakSubject: true,
   displayName: true,
+  displayNameOverride: true,
   email: true,
 } as const;
 export const reportInclude = {
@@ -44,8 +45,8 @@ export function summaryRow(project: ReportProject) {
       project.stages.find(
         (stage) => stage.position === project.currentStageIndex,
       ) ?? null,
-    responsible: project.responsible,
-    supervisor: project.supervisor,
+    responsible: publicProfile(project.responsible),
+    supervisor: project.supervisor ? publicProfile(project.supervisor) : null,
     createdAt: project.createdAt,
     closedAt: project.closedAt,
     vendor: project.vendor,
@@ -146,12 +147,22 @@ export class ReportRepository {
     if (!project) return null;
     return {
       ...summaryRow(project),
-      stages: project.stages,
+      stages: project.stages.map((stage) => ({
+        ...stage,
+        files: stage.files.map((file) => ({
+          ...file,
+          uploadedBy: publicProfile(file.uploadedBy),
+        })),
+      })),
       comments: project.comments.map((c) => ({
         ...c,
+        author: publicProfile(c.author),
         body: c.deletedAt ? null : c.body,
       })),
-      events: project.events,
+      events: project.events.map((event) => ({
+        ...event,
+        actor: publicProfile(event.actor),
+      })),
       generatedAt: new Date(),
     };
   }

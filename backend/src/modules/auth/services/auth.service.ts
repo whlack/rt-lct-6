@@ -9,7 +9,7 @@ export class AuthService {
     @Inject(KeycloakTokenAdapter)
     private readonly tokens: Pick<KeycloakTokenAdapter, 'verify'>,
     @Inject(UserRepository)
-    private readonly users: Pick<UserRepository, 'ensure'>,
+    private readonly users: Pick<UserRepository, 'ensure' | 'name'>,
   ) {}
 
   async authenticate(token: string): Promise<AuthUser> {
@@ -19,15 +19,16 @@ export class AuthService {
     if (!level || !payload.sub) {
       throw new UnauthorizedException('CRM role is required');
     }
+    const id = await this.users.ensure(payload.sub, {
+      name: payload.name,
+      email: payload.email,
+    });
     return {
-      id: await this.users.ensure(payload.sub, {
-        name: payload.name,
-        email: payload.email,
-      }),
+      id,
       subject: payload.sub,
       level,
       email: payload.email,
-      name: payload.name,
+      name: await this.users.name(id),
     };
   }
 

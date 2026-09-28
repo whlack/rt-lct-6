@@ -8,21 +8,22 @@ datasource db {
 }
 
 model User {
-  id              String                 @id @default(uuid()) @db.Uuid
-  keycloakSubject String                 @unique @map("keycloak_subject")
-  displayName     String?                @map("display_name")
-  email           String?
-  createdAt       DateTime               @default(now()) @map("created_at")
-  universities    University[]           @relation("UniversityCreator")
-  assignments     UniversityAssignment[]
-  projectsCreated Project[]              @relation("ProjectCreator")
-  projectsOwned   Project[]              @relation("ProjectResponsible")
-  projectsLed     Project[]              @relation("ProjectSupervisor")
-  comments        ProjectComment[]
-  files           ProjectFile[]
-  events          ProjectEvent[]
-  exportJobs      ExportJob[]
-  importJobs      ImportJob[]
+  id                  String                 @id @default(uuid()) @db.Uuid
+  keycloakSubject     String                 @unique @map("keycloak_subject")
+  displayName         String?                @map("display_name")
+  displayNameOverride String?                @map("display_name_override")
+  email               String?
+  createdAt           DateTime               @default(now()) @map("created_at")
+  universities        University[]           @relation("UniversityCreator")
+  assignments         UniversityAssignment[]
+  projectsCreated     Project[]              @relation("ProjectCreator")
+  projectsOwned       Project[]              @relation("ProjectResponsible")
+  projectsLed         Project[]              @relation("ProjectSupervisor")
+  comments            ProjectComment[]
+  files               ProjectFile[]
+  events              ProjectEvent[]
+  exportJobs          ExportJob[]
+  importJobs          ImportJob[]
 
   @@map("users")
 }
@@ -36,28 +37,31 @@ model Permission {
 }
 
 model Direction {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique
-  createdAt DateTime  @default(now()) @map("created_at")
-  projects  Project[]
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
 
   @@map("directions")
 }
 
 model Program {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique
-  createdAt DateTime  @default(now()) @map("created_at")
-  projects  Project[]
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
 
   @@map("programs")
 }
 
 model Product {
-  id        String    @id @default(uuid()) @db.Uuid
-  name      String    @unique
-  createdAt DateTime  @default(now()) @map("created_at")
-  projects  Project[]
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
 
   @@map("products")
 }
@@ -65,6 +69,7 @@ model Product {
 model University {
   id               String                 @id @default(uuid()) @db.Uuid
   name             String                 @unique
+  normalizedName   String                 @unique @default(dbgenerated()) @map("normalized_name")
   primaryContactId String?                @map("primary_contact_id") @db.Uuid
   primaryContact   UniversityContact?     @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
   contacts         UniversityContact[]    @relation("UniversityContacts")
@@ -317,6 +322,7 @@ model ImportJob {
 }
 
 model ImportRow {
+  position    Int       @default(0)
   id          String    @id @default(uuid()) @db.Uuid
   jobId       String    @map("job_id") @db.Uuid
   job         ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)

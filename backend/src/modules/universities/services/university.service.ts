@@ -1,3 +1,4 @@
+import { catalogName } from '../../../common/catalog-name.js';
 import {
   BadRequestException,
   ConflictException,
@@ -51,21 +52,21 @@ export class UniversityService {
   }
 
   async create(user: AuthUser, name: string) {
-    if (!name.trim())
+    if (!catalogName(name))
       throw new BadRequestException('University name is required');
     try {
-      return await this.repository.create(name.trim(), user.id);
+      return await this.repository.create(catalogName(name), user.id);
     } catch (error) {
       rethrow(error);
     }
   }
 
   async update(user: AuthUser, id: string, name: string) {
-    if (!name.trim())
+    if (!catalogName(name))
       throw new BadRequestException('University name is required');
     await this.get(user, id);
     try {
-      return await this.repository.update(id, name.trim());
+      return await this.repository.update(id, catalogName(name));
     } catch (error) {
       rethrow(error);
     }

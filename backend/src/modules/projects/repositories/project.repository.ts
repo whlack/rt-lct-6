@@ -1,14 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { DatabaseService } from '../../../database/database.service.js';
-import type { AuthUser } from '../../auth/index.js';
+import { publicProfile, type AuthUser } from '../../auth/index.js';
 import { projectScope } from '../project-scope.js';
 
 const projectInclude = {
   university: { select: { id: true, name: true } },
-  direction: true,
-  program: true,
-  product: true,
+  direction: { select: { id: true, name: true } },
+  program: { select: { id: true, name: true } },
+  product: { select: { id: true, name: true } },
   responsible: { select: { id: true, keycloakSubject: true } },
   supervisor: { select: { id: true, keycloakSubject: true } },
   stages: {
@@ -196,11 +196,26 @@ export class ProjectRepository {
   }
 
   listEvents(projectId: string) {
-    return this.database.prisma.projectEvent.findMany({
-      where: { projectId },
-      include: { actor: { select: { displayName: true, email: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
+    return this.database.prisma.projectEvent
+      .findMany({
+        where: { projectId },
+        include: {
+          actor: {
+            select: {
+              displayName: true,
+              displayNameOverride: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+      .then((events) =>
+        events.map((event) => ({
+          ...event,
+          actor: publicProfile(event.actor),
+        })),
+      );
   }
 
   findFile(id: string) {
@@ -208,20 +223,33 @@ export class ProjectRepository {
   }
 
   listComments(projectId: string) {
-    return this.database.prisma.projectComment.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        parentId: true,
-        authorId: true,
-        author: { select: { displayName: true, email: true } },
-        body: true,
-        deletedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    return this.database.prisma.projectComment
+      .findMany({
+        where: { projectId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          parentId: true,
+          authorId: true,
+          author: {
+            select: {
+              displayName: true,
+              displayNameOverride: true,
+              email: true,
+            },
+          },
+          body: true,
+          deletedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+      .then((comments) =>
+        comments.map((comment) => ({
+          ...comment,
+          author: publicProfile(comment.author),
+        })),
+      );
   }
 
   findComment(id: string) {

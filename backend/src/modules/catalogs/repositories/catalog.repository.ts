@@ -14,14 +14,17 @@ export class CatalogRepository {
       case 'directions':
         return this.database.prisma.direction.findMany({
           orderBy: { name: 'asc' },
+          select: { id: true, name: true },
         });
       case 'programs':
         return this.database.prisma.program.findMany({
           orderBy: { name: 'asc' },
+          select: { id: true, name: true },
         });
       case 'products':
         return this.database.prisma.product.findMany({
           orderBy: { name: 'asc' },
+          select: { id: true, name: true },
         });
     }
   }
@@ -29,11 +32,20 @@ export class CatalogRepository {
   create(kind: CatalogKind, name: string) {
     switch (kind) {
       case 'directions':
-        return this.database.prisma.direction.create({ data: { name } });
+        return this.database.prisma.direction.create({
+          data: { name },
+          select: { id: true, name: true },
+        });
       case 'programs':
-        return this.database.prisma.program.create({ data: { name } });
+        return this.database.prisma.program.create({
+          data: { name },
+          select: { id: true, name: true },
+        });
       case 'products':
-        return this.database.prisma.product.create({ data: { name } });
+        return this.database.prisma.product.create({
+          data: { name },
+          select: { id: true, name: true },
+        });
     }
   }
 
@@ -43,16 +55,19 @@ export class CatalogRepository {
         return this.database.prisma.direction.update({
           where: { id },
           data: { name },
+          select: { id: true, name: true },
         });
       case 'programs':
         return this.database.prisma.program.update({
           where: { id },
           data: { name },
+          select: { id: true, name: true },
         });
       case 'products':
         return this.database.prisma.product.update({
           where: { id },
           data: { name },
+          select: { id: true, name: true },
         });
     }
   }
