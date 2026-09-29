@@ -12,3 +12,5 @@ export {
   reportTimezone,
   validateFilters,
 } from './report-filters.js';
+
+export { reportFilterSchema } from './dto/report-response.js';

@@ -1,5 +1,12 @@
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { dashboardSchema } from '../dto/dashboard-response.schema.js';
+import { ApiErrors, authenticationErrors } from '../../../common/api-errors.js';
 import { Controller, Get, Inject, Req } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   currentUser,
   RequirePermission,
@@ -14,11 +21,15 @@ export class DashboardController {
     @Inject(DashboardService) private readonly dashboard: DashboardService,
   ) {}
   @Get()
-  @RequirePermission('dashboard.read')
+  @ApiOkResponse({ schema: dashboardSchema })
   @ApiOperation({
-    summary:
-      'Visible universities, open projects and open projects expecting a KAM',
+    summary: 'Показатели главной',
+    description:
+      'Право: dashboard.read. Согласованный SQL-снимок в области видимости: все доступные вузы, проекты с closedAt=null и открытые проекты с expectedActor=KAM на текущем этапе. Личное назначение дополнительным условием не является.',
+    operationId: 'dashboard_get',
   })
+  @ApiErrors({ ...authenticationErrors })
+  @RequirePermission('dashboard.read')
   get(@Req() request: AuthRequest) {
     return this.dashboard.get(currentUser(request));
   }

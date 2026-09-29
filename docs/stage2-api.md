@@ -1,6 +1,6 @@
 # Серверный этап 2
 
-Frontend остаётся отдельным этапом. Новые права: dashboard.read — 10; reports.read, reports.export, statistics.read — 20. Импорт использует catalogs.import — 20. Право не заменяет проверку видимости данных.
+Клиент использует эти контракты; рабочие сценарии описаны в [руководстве](./frontend/guide.md). Новые права: dashboard.read — 10; reports.read, reports.export, statistics.read — 20. Импорт использует catalogs.import — 20. Право не заменяет проверку видимости данных.
 
 ## Показатели
 
@@ -59,7 +59,13 @@ POST /api/catalog-imports/:id/apply — отдельное подтвержде�
 
 ## Список проектов и очищаемые поля
 
-`GET /api/projects?page=1&pageSize=25` возвращает `{rows,total,page,pageSize}`; pageSize — 1–100. Строка содержит идентификаторы ответственных, вуз/направление/программу или продукт, currentStage, createdAt/closedAt. Полный workflow и метаданные файлов находятся в отдельной карточке проекта. Это изменение прежнего ответа-массива следует учесть при разработке клиента.
+`GET /api/projects?page=1&pageSize=25` возвращает `{rows,total,page,pageSize}`; pageSize — 1–100. Строка содержит идентификаторы и публичные профили ответственных, вуз/направление/программу или продукт, currentStage (включая expectedActor и expectedContact), stageCount, createdAt/closedAt. Полный workflow и метаданные файлов находятся в отдельной карточке проекта. Это изменение прежнего ответа-массива следует учесть при разработке клиента.
+
+Фильтры реестра: universityId, directionId, programId, productId, responsibleSubject (UUID), status=ACTIVE|CLOSED, search (до 200 символов; вуз, направление, программа/продукт, номер договора). `actionRequired=true` выбирает только незакрытые проекты, чей **текущий** этап ожидает действия КАМ; ожидание вуза и будущие этапы не учитываются. Все фильтры сочетаются с областью видимости и пагинацией.
+
+`GET /api/projects/activity` с правом `projects.read` возвращает до 25 последних событий видимых проектов: ID/тип/время события, публичный профиль автора и краткое описание проекта. Публичные профили учитывают локальное отображаемое имя и не раскрывают служебный displayNameOverride.
+
+`GET /api/config` доступен без авторизации и возвращает только `{keycloak:{url,realm,clientId}}` для публичного OIDC-клиента. Пароли, конфигурация сервисного клиента и другие переменные окружения в ответ не входят. Клиент обращается к `/api/me` после корпоративного входа.
 
 В PATCH проекта `vendor`, `contractNumber`, `licenseSignedAt`, `licenseExpiresYear` можно очистить явным null. В PATCH контакта null очищает email/phone; отсутствующее поле сохраняет прежнее значение. Хотя бы один канал должен остаться. Удалённый комментарий имеет body=null; повторное редактирование возвращает 409.
 
@@ -68,3 +74,5 @@ POST /api/catalog-imports/:id/apply — отдельное подтвержде�
 В POST отчёта optional `columns` задаёт порядок колонок сводки: id, university, direction, offeringType, offering, status, stage, responsible, supervisor, createdAt, closedAt, vendor, contractNumber, licenseSignedAt, licenseExpiresYear, transferStatus. Без поля выбираются все; пустой, повторяющийся или неизвестный список отклоняется. Для отчёта проекта настройка относится только к секции сводки.
 
 Пример: `{ "format": "json", "columns": ["university", "id"] }`. JSON-файл имеет title/generatedAt/timezone и sections; каждая секция содержит title, columns и rows с упорядоченными значениями. Полный JSON проекта содержит также этапы, документы, комментарии и историю; ключи S3 и удалённые тексты не включаются. Создание и получение проходят тот же `/api/jobs` и повторные проверки доступа.
+
+Полная спецификация всех этапов доступна через Swagger вне production. См. [руководство OpenAPI](./openapi.md) для входа, ошибок, загрузки файлов и последовательностей фоновых операций.

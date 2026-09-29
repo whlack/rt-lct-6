@@ -33,3 +33,14 @@ test('Nest resolves the public status controller', async () => {
     }
   }
 });
+
+test('browser configuration is an allowlist and contains no service credentials', () => {
+  const service = new StatusService({ isReady: async () => true });
+  assert.deepEqual(Object.keys(service.publicConfig()), ['keycloak']);
+  assert.deepEqual(Object.keys(service.publicConfig().keycloak).sort(), [
+    'clientId',
+    'realm',
+    'url',
+  ]);
+  assert.equal(service.publicConfig().keycloak.realm, 'crm');
+});
