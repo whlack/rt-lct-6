@@ -7,3 +7,5 @@ backend/src/generated
 .env
 docker-compose.yaml
 docker-compose.prod.yaml
+
+.artifacts

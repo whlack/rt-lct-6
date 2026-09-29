@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="CRM — серверный этап 2" id="crm-stage2" version="5.0.0">
+  <folder name="Strategy" id="id-0ae0920ad29048b6be2afefe42bc9379" type="strategy"/>
+  <folder name="Business" id="id-e7ada7ab11864b379b9fe1d82595fa32" type="business"/>
+  <folder name="application" id="folder-application" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="NestJS API" id="api"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Worker BullMQ" id="worker"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Keycloak" id="keycloak"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Закрытое S3" id="storage"/>
+    <element xsi:type="archimate:DataObject" name="User / локальное ФИО" id="user"/>
+    <element xsi:type="archimate:DataObject" name="University / назначения" id="university"/>
+    <element xsi:type="archimate:DataObject" name="Project / этапы / история" id="project"/>
+    <element xsi:type="archimate:DataObject" name="Каталоги / normalizedName" id="catalog"/>
+    <element xsi:type="archimate:DataObject" name="ExportJob / проекты результата" id="export"/>
+    <element xsi:type="archimate:DataObject" name="ImportJob / ImportRow" id="import"/>
+  </folder>
+  <folder name="technology" id="folder-technology" type="technology">
+    <element xsi:type="archimate:Node" name="Linux / Docker" id="host"/>
+    <element xsi:type="archimate:Node" name="Контейнер API" id="api-node"/>
+    <element xsi:type="archimate:Node" name="Контейнер worker" id="worker-node"/>
+    <element xsi:type="archimate:SystemSoftware" name="PostgreSQL 17" id="postgres"/>
+    <element xsi:type="archimate:SystemSoftware" name="Redis / очереди" id="redis"/>
+    <element xsi:type="archimate:SystemSoftware" name="Chromium / Playwright" id="chromium"/>
+    <element xsi:type="archimate:SystemSoftware" name="Внешний nginx / TLS" id="nginx"/>
+    <element xsi:type="archimate:SystemSoftware" name="Keycloak / realm CRM" id="keycloak-node"/>
+    <element xsi:type="archimate:SystemSoftware" name="Закрытый S3 / MinIO" id="storage-node"/>
+  </folder>
+  <folder name="Motivation" id="id-3f9cdc7ce4a541b9be6bac52ab2f673d" type="motivation"/>
+  <folder name="Implementation &amp; Migration" id="id-93eef0cccf11420a8b9fc35336912676" type="implementation_migration"/>
+  <folder name="Other" id="id-1b91f897597f47d1a09171c2f36c6ab6" type="other"/>
+  <folder name="Relations" id="folder-relations" type="relations">
+    <element xsi:type="archimate:FlowRelationship" name="jobId / очередь" id="rel-0" source="api" target="worker"/>
+    <element xsi:type="archimate:ServingRelationship" name="OIDC" id="rel-1" source="keycloak" target="api"/>
+    <element xsi:type="archimate:ServingRelationship" name="Текущие роли" id="rel-2" source="keycloak" target="worker"/>
+    <element xsi:type="archimate:FlowRelationship" name="Файл результата" id="rel-3" source="worker" target="storage"/>
+    <element xsi:type="archimate:FlowRelationship" name="Защищённая выдача" id="rel-4" source="api" target="storage"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Принадлежность" id="rel-5" source="project" target="university"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Ответственный" id="rel-6" source="project" target="user"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Направление / предложение" id="rel-7" source="project" target="catalog"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Включённые проекты" id="rel-8" source="export" target="project"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Автор" id="rel-9" source="export" target="user"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Автор" id="rel-10" source="import" target="user"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-11" source="host" target="api-node"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-12" source="host" target="worker-node"/>
+    <element xsi:type="archimate:CompositionRelationship" id="rel-13" source="worker-node" target="chromium"/>
+    <element xsi:type="archimate:ServingRelationship" name="API / TLS" id="rel-14" source="nginx" target="api-node"/>
+    <element xsi:type="archimate:AssociationRelationship" name="SQL" id="rel-15" source="api-node" target="postgres"/>
+    <element xsi:type="archimate:AssociationRelationship" name="SQL" id="rel-16" source="worker-node" target="postgres"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Dispatch" id="rel-17" source="api-node" target="redis"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Consume" id="rel-18" source="worker-node" target="redis"/>
+    <element xsi:type="archimate:AssociationRelationship" name="OIDC" id="rel-19" source="keycloak-node" target="api-node"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Текущие роли" id="rel-20" source="keycloak-node" target="worker-node"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Приём / выдача" id="rel-21" source="api-node" target="storage-node"/>
+    <element xsi:type="archimate:AssociationRelationship" name="Результат" id="rel-22" source="worker-node" target="storage-node"/>
+  </folder>
+  <folder name="Views" id="folder-views" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Приложение" id="view-application">
+      <child xsi:type="archimate:DiagramObject" id="node-application-api" targetConnections="conn-application-1" archimateElement="api">
+        <bounds x="40" y="240" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-application-0" source="node-application-api" target="node-application-worker" archimateRelationship="rel-0"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-application-4" source="node-application-api" target="node-application-storage" archimateRelationship="rel-4"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-application-worker" targetConnections="conn-application-0 conn-application-2" archimateElement="worker">
+        <bounds x="760" y="240" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-application-3" source="node-application-worker" target="node-application-storage" archimateRelationship="rel-3"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-application-keycloak" archimateElement="keycloak">
+        <bounds x="400" y="20" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-application-1" source="node-application-keycloak" target="node-application-api" archimateRelationship="rel-1"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-application-2" source="node-application-keycloak" target="node-application-worker" archimateRelationship="rel-2"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-application-storage" targetConnections="conn-application-4 conn-application-3" archimateElement="storage">
+        <bounds x="400" y="460" width="220" height="90"/>
+      </child>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Данные" id="view-data">
+      <child xsi:type="archimate:DiagramObject" id="node-data-user" targetConnections="conn-data-6 conn-data-9 conn-data-10" archimateElement="user">
+        <bounds x="40" y="40" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-data-university" targetConnections="conn-data-5" archimateElement="university">
+        <bounds x="760" y="260" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-data-project" targetConnections="conn-data-8" archimateElement="project">
+        <bounds x="400" y="440" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-5" source="node-data-project" target="node-data-university" archimateRelationship="rel-5"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-6" source="node-data-project" target="node-data-user" archimateRelationship="rel-6"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-7" source="node-data-project" target="node-data-catalog" archimateRelationship="rel-7"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-data-catalog" targetConnections="conn-data-7" archimateElement="catalog">
+        <bounds x="760" y="620" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-data-export" archimateElement="export">
+        <bounds x="400" y="40" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-8" source="node-data-export" target="node-data-project" archimateRelationship="rel-8"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-9" source="node-data-export" target="node-data-user" archimateRelationship="rel-9"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-data-import" archimateElement="import">
+        <bounds x="40" y="440" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-data-10" source="node-data-import" target="node-data-user" archimateRelationship="rel-10"/>
+      </child>
+    </element>
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Развёртывание" id="view-deployment">
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-host" archimateElement="host">
+        <bounds x="400" y="260" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-11" source="node-deployment-host" target="node-deployment-api-node" archimateRelationship="rel-11"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-12" source="node-deployment-host" target="node-deployment-worker-node" archimateRelationship="rel-12"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-api-node" targetConnections="conn-deployment-11 conn-deployment-14 conn-deployment-19" archimateElement="api-node">
+        <bounds x="40" y="500" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-15" source="node-deployment-api-node" target="node-deployment-postgres" archimateRelationship="rel-15"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-17" source="node-deployment-api-node" target="node-deployment-redis" archimateRelationship="rel-17"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-21" source="node-deployment-api-node" target="node-deployment-storage-node" archimateRelationship="rel-21">
+          <bendpoint startX="150" startY="55" endX="-570" endY="-425"/>
+          <bendpoint startX="150" startY="655" endX="-570" endY="175"/>
+          <bendpoint startX="720" startY="655" endY="175"/>
+        </sourceConnection>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-worker-node" targetConnections="conn-deployment-12 conn-deployment-20" archimateElement="worker-node">
+        <bounds x="760" y="500" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-13" source="node-deployment-worker-node" target="node-deployment-chromium" archimateRelationship="rel-13"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-16" source="node-deployment-worker-node" target="node-deployment-postgres" archimateRelationship="rel-16"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-18" source="node-deployment-worker-node" target="node-deployment-redis" archimateRelationship="rel-18"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-22" source="node-deployment-worker-node" target="node-deployment-storage-node" archimateRelationship="rel-22"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-postgres" targetConnections="conn-deployment-15 conn-deployment-16" archimateElement="postgres">
+        <bounds x="400" y="740" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-redis" targetConnections="conn-deployment-17 conn-deployment-18" archimateElement="redis">
+        <bounds x="400" y="980" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-chromium" targetConnections="conn-deployment-13" archimateElement="chromium">
+        <bounds x="1000" y="740" width="220" height="90"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-nginx" archimateElement="nginx">
+        <bounds x="40" y="260" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-14" source="node-deployment-nginx" target="node-deployment-api-node" archimateRelationship="rel-14"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-keycloak-node" archimateElement="keycloak-node">
+        <bounds x="400" y="20" width="220" height="90"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-19" source="node-deployment-keycloak-node" target="node-deployment-api-node" archimateRelationship="rel-19"/>
+        <sourceConnection xsi:type="archimate:Connection" id="conn-deployment-20" source="node-deployment-keycloak-node" target="node-deployment-worker-node" archimateRelationship="rel-20"/>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="node-deployment-storage-node" targetConnections="conn-deployment-21 conn-deployment-22" archimateElement="storage-node">
+        <bounds x="760" y="980" width="220" height="90"/>
+      </child>
+    </element>
+  </folder>
+</archimate:model>

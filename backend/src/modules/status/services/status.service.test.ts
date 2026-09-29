@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../../../app.module.js';
+import { StatusModule } from '../status.module.js';
 import { StatusController } from '../controllers/status.controller.js';
 import { StatusService } from './status.service.js';
 
@@ -20,7 +20,7 @@ test('Nest resolves the public status controller', async () => {
     'postgresql://unused:unused@localhost:5432/unused';
 
   try {
-    const app = await NestFactory.createApplicationContext(AppModule, {
+    const app = await NestFactory.createApplicationContext(StatusModule, {
       logger: false,
     });
     assert.ok(app.get(StatusController));
@@ -32,4 +32,15 @@ test('Nest resolves the public status controller', async () => {
       process.env.DATABASE_URL = previousUrl;
     }
   }
+});
+
+test('browser configuration is an allowlist and contains no service credentials', () => {
+  const service = new StatusService({ isReady: async () => true });
+  assert.deepEqual(Object.keys(service.publicConfig()), ['keycloak']);
+  assert.deepEqual(Object.keys(service.publicConfig().keycloak).sort(), [
+    'clientId',
+    'realm',
+    'url',
+  ]);
+  assert.equal(service.publicConfig().keycloak.realm, 'crm');
 });
