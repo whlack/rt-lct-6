@@ -5,10 +5,10 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
-import type { Prisma } from '../../../generated/prisma/client.js';
+import { Prisma } from '../../../generated/prisma/client.js';
 import { DatabaseService } from '../../../database/database.service.js';
 import { publicProfile, type AuthUser } from '../../auth/index.js';
-import { projectScope } from '../project-scope.js';
+import { projectScope, projectScopeSql } from '../project-scope.js';
 import type { ProjectQueryDto } from '../dto/project.dto.js';
 
 const profileSelect = {
@@ -23,8 +23,8 @@ const projectInclude = {
   direction: { select: { id: true, name: true } },
   program: { select: { id: true, name: true } },
   product: { select: { id: true, name: true } },
-  responsible: { select: { id: true, keycloakSubject: true } },
-  supervisor: { select: { id: true, keycloakSubject: true } },
+  responsible: { select: profileSelect },
+  supervisor: { select: profileSelect },
   stages: {
     orderBy: { position: 'asc' as const },
     include: {
@@ -183,19 +183,47 @@ export class ProjectRepository {
     };
     return this.database.prisma.$transaction(
       async (tx) => {
-        // Current position is a column comparison, not a relation filter on any KAM stage.
+        let total: number;
         if (query.actionRequired) {
+          // Filter the current stage in SQL, then fetch only the page projection. Never materialize all project IDs.
+          const conditions = [
+            projectScopeSql(user),
+            Prisma.sql`p.closed_at IS NULL AND s.expected_actor = 'KAM'`,
+          ];
+          for (const [value, column] of [
+            [query.universityId, Prisma.sql`p.university_id`],
+            [query.directionId, Prisma.sql`p.direction_id`],
+            [query.programId, Prisma.sql`p.program_id`],
+            [query.productId, Prisma.sql`p.product_id`],
+          ] as const)
+            if (value) conditions.push(Prisma.sql`${column} = ${value}::uuid`);
+          if (query.responsibleSubject)
+            conditions.push(
+              Prisma.sql`r.keycloak_subject = ${query.responsibleSubject}`,
+            );
+          if (query.status === 'CLOSED') conditions.push(Prisma.sql`FALSE`);
+          if (search) {
+            const pattern = '%' + search + '%';
+            conditions.push(
+              Prisma.sql`(u.name ILIKE ${pattern} OR d.name ILIKE ${pattern} OR a.name ILIKE ${pattern} OR b.name ILIKE ${pattern} OR p.contract_number ILIKE ${pattern})`,
+            );
+          }
+          const from = Prisma.sql`FROM projects p JOIN project_stages s ON s.project_id=p.id AND s.position=p.current_stage_index
+            JOIN universities u ON u.id=p.university_id JOIN directions d ON d.id=p.direction_id
+            JOIN users r ON r.id=p.responsible_id LEFT JOIN programs a ON a.id=p.program_id LEFT JOIN products b ON b.id=p.product_id
+            WHERE ${Prisma.join(conditions, ' AND ')}`;
+          const [count] = await tx.$queryRaw<
+            Array<{ total: bigint }>
+          >`SELECT COUNT(*) AS total ${from}`;
+          total = Number(count.total);
           const ids = await tx.$queryRaw<
             Array<{ id: string }>
-          >`SELECT p.id FROM projects p
-            JOIN project_stages s ON s.project_id = p.id AND s.position = p.current_stage_index
-            WHERE p.closed_at IS NULL AND s.expected_actor = 'KAM'`;
+          >`SELECT p.id ${from} ORDER BY p.created_at DESC, p.id ASC LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`;
           where.AND = [
-            ...(Array.isArray(where.AND) ? where.AND : []),
+            projectScope(user),
             { id: { in: ids.map((item) => item.id) } },
           ];
-        }
-        const total = await tx.project.count({ where });
+        } else total = await tx.project.count({ where });
         const projects = await tx.project.findMany({
           where,
           select: {
@@ -222,7 +250,7 @@ export class ProjectRepository {
             },
           },
           orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-          skip: (query.page - 1) * query.pageSize,
+          skip: query.actionRequired ? 0 : (query.page - 1) * query.pageSize,
           take: query.pageSize,
         });
         const rows = projects.map(

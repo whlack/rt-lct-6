@@ -114,7 +114,7 @@ export class ProjectsController {
   @RequirePermission('projects.read')
   @ApiOkResponse({ schema: projectCard })
   get(@Req() request: AuthRequest, @UuidParam('id') id: string) {
-    return this.projects.getVisible(currentUser(request), id);
+    return this.projects.getCard(currentUser(request), id);
   }
 
   @Post()

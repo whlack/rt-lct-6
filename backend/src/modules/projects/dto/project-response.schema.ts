@@ -8,7 +8,6 @@ import {
   object,
   profileName,
   publicProfile,
-  subjectProfile,
   text,
   uuid,
 } from '../../../common/api-schema.js';
@@ -71,8 +70,8 @@ export const projectCard = object({
   direction: named,
   program: nullable(named),
   product: nullable(named),
-  responsible: subjectProfile,
-  supervisor: nullable(subjectProfile),
+  responsible: publicProfile,
+  supervisor: nullable(publicProfile),
   stages: array(stage),
 });
 const currentStage = object({

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import type { ProjectQueryDto } from '../dto/project.dto.js';
 import type { AuthUser } from '../../auth/index.js';
-import { AuthService } from '../../auth/index.js';
+import { AuthService, publicProfile } from '../../auth/index.js';
 import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directory.adapter.js';
 import { UniversityService } from '../../universities/index.js';
 import type {
@@ -71,6 +71,15 @@ export class ProjectService {
     const project = await this.repository.findVisible(user, id);
     if (!project) throw new NotFoundException('Project not found');
     return project;
+  }
+
+  async getCard(user: AuthUser, id: string) {
+    const project = await this.getVisible(user, id);
+    return {
+      ...project,
+      responsible: publicProfile(project.responsible),
+      supervisor: project.supervisor ? publicProfile(project.supervisor) : null,
+    };
   }
 
   async create(user: AuthUser, body: CreateProjectDto) {
@@ -283,7 +292,7 @@ export class ProjectService {
         details: { stages: titles },
       });
     });
-    return this.repository.find(id);
+    return this.getCard(user, id);
   }
 
   async advance(user: AuthUser, id: string, body: AdvanceStageDto) {

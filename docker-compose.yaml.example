@@ -210,8 +210,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: development
     environment:
-      VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:?}
-      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?}
+      API_UPSTREAM: ${API_UPSTREAM:-http://backend:3000}
     volumes:
       - ./frontend/src:/workspace/frontend/src
     ports:

@@ -1,5 +1,11 @@
 @import 'tailwindcss';
-
-body {
-  margin: 0;
-}
+@import './styles/style.css';
+@import './styles/glass.css';
+@import './styles/glass-workspace.css';
+@import './styles/glass-dashboard.css';
+@import './styles/glass-reports.css';
+@import './styles/workflow-workspace.css';
+@import './styles/controls.css';
+@import './styles/employee-admin.css';
+@import './styles/standard-workspace.css';
+@import './styles/production.css';
