@@ -11,6 +11,8 @@ const prisma = new PrismaClient({
 });
 
 const permissions = [
+  ['integrations.sync', 20],
+  ['integrations.manage', 20],
   ['dashboard.read', 10],
   ['reports.read', 20],
   ['reports.export', 20],

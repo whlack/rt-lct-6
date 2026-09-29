@@ -1,12 +1,6 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  Param,
-  ParseUUIDPipe,
-  Req,
-  StreamableFile,
-} from '@nestjs/common';
+import { attachmentDisposition } from '../../../common/attachment-disposition.js';
+import { UuidParam } from '../../../common/validated-input.js';
+import { Controller, Get, Inject, Req, StreamableFile } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -52,7 +46,7 @@ export class JobsController {
       },
     },
   })
-  get(@Req() request: AuthRequest, @Param('id', ParseUUIDPipe) id: string) {
+  get(@Req() request: AuthRequest, @UuidParam('id') id: string) {
     return this.jobs.get(currentUser(request), id);
   }
   @Get(':id/file')
@@ -63,15 +57,11 @@ export class JobsController {
       'Binary result; current owner permissions and project visibility are rechecked',
     schema: { type: 'string', format: 'binary' },
   })
-  async file(
-    @Req() request: AuthRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  async file(@Req() request: AuthRequest, @UuidParam('id') id: string) {
     const result = await this.jobs.file(currentUser(request), id);
     return new StreamableFile(result.bytes, {
       type: result.mimeType,
-      disposition:
-        "attachment; filename*=UTF-8''" + encodeURIComponent(result.fileName),
+      disposition: attachmentDisposition(result.fileName),
       length: result.bytes.length,
     });
   }

@@ -2,5 +2,9 @@ import type { AuthUser } from '../auth/index.js';
 import type { Prisma } from '../../generated/prisma/client.js';
 
 export function universityScope(user: AuthUser): Prisma.UniversityWhereInput {
-  return user.level >= 20 ? {} : { assignments: { some: { userId: user.id } } };
+  return user.level >= 20 || user.visibility?.mode === 'ALL'
+    ? {}
+    : user.visibility?.mode === 'SELECTED'
+      ? { id: { in: user.visibility.universityIds } }
+      : { assignments: { some: { userId: user.id } } };
 }

@@ -19,72 +19,95 @@ import {
 } from 'class-validator';
 
 export class CreateProjectDto {
-  @ApiProperty() @IsUUID() universityId!: string;
-  @ApiProperty() @IsUUID() directionId!: string;
-  @ApiPropertyOptional() @IsOptional() @IsUUID() programId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsUUID() productId?: string;
-  @ApiProperty() @IsUUID() responsibleSubject!: string;
-  @ApiPropertyOptional()
+  @ApiProperty({ type: String }) @IsUUID() universityId!: string;
+  @ApiProperty({ type: String }) @IsUUID() directionId!: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  programId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+  @ApiProperty({ type: String }) @IsUUID() responsibleSubject!: string;
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   @MaxLength(200)
   vendor?: string;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   @MaxLength(200)
   contractNumber?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() licenseSignedAt?: string;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsDateString()
+  licenseSignedAt?: string;
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsInt()
   @Min(2000)
   @Max(2100)
   licenseExpiresYear?: number;
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsIn(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'])
   transferStatus?: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
 export class UpdateProjectDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  vendor?: string;
-  @ApiPropertyOptional()
+  vendor?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  contractNumber?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() licenseSignedAt?: string;
-  @ApiPropertyOptional()
+  contractNumber?: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsDateString()
+  licenseSignedAt?: string | null;
+  @ApiPropertyOptional({ type: Number, nullable: true })
   @IsOptional()
   @IsInt()
   @Min(2000)
   @Max(2100)
-  licenseExpiresYear?: number;
-  @ApiPropertyOptional()
+  licenseExpiresYear?: number | null;
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsIn(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'])
   transferStatus?: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 }
 
 export class AssignProjectDto {
-  @ApiProperty() @IsUUID() subject!: string;
+  @ApiProperty({ type: String }) @IsUUID() subject!: string;
 }
 
 export class DocumentTypeDto {
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(160) name!: string;
-  @ApiProperty() @IsBoolean() isRequired!: boolean;
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
+  name!: string;
+  @ApiProperty({ type: Boolean }) @IsBoolean() isRequired!: boolean;
 }
 
 export class WorkflowStageDto {
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) title!: string;
-  @ApiProperty() @IsIn(['KAM', 'UNIVERSITY']) expectedActor!:
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  title!: string;
+  @ApiProperty({ type: String }) @IsIn(['KAM', 'UNIVERSITY']) expectedActor!:
     'KAM' | 'UNIVERSITY';
-  @ApiPropertyOptional() @IsOptional() @IsUUID() expectedContactId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  expectedContactId?: string;
   @ApiProperty({ type: [DocumentTypeDto] })
   @IsArray()
   @ArrayMaxSize(30)
@@ -104,14 +127,25 @@ export class ConfigureWorkflowDto {
 }
 
 export class AdvanceStageDto {
-  @ApiProperty() @IsUUID() expectedStageId!: string;
+  @ApiProperty({ type: String }) @IsUUID() expectedStageId!: string;
 }
 
 export class CommentDto {
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(5000) body!: string;
-  @ApiPropertyOptional() @IsOptional() @IsUUID() parentId?: string;
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  body!: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
 }
 
 export class CommentBodyDto {
-  @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(5000) body!: string;
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  body!: string;
 }

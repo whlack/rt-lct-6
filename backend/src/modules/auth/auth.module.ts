@@ -1,3 +1,6 @@
+import { VisibilityController } from './controllers/visibility.controller.js';
+import { VisibilityService } from './services/visibility.service.js';
+import { VisibilityRepository } from './repositories/visibility.repository.js';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from '../../database/database.module.js';
@@ -12,12 +15,14 @@ import { AuthService } from './services/auth.service.js';
 
 @Module({
   imports: [DatabaseModule, PermissionsModule],
-  controllers: [MeController, EmployeesController],
+  controllers: [MeController, EmployeesController, VisibilityController],
   providers: [
     KeycloakTokenAdapter,
     KeycloakDirectoryAdapter,
     UserRepository,
     AuthService,
+    VisibilityService,
+    VisibilityRepository,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
   exports: [

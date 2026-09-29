@@ -1,12 +1,5 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  Param,
-  ParseUUIDPipe,
-  Query,
-  Req,
-} from '@nestjs/common';
+import { UuidParam, ValidatedQuery } from '../../../common/validated-input.js';
+import { Controller, Get, Inject, Req } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -41,7 +34,10 @@ export class ReportsController {
     summary:
       'Current project summary; period selects projects with events in the inclusive local date range',
   })
-  list(@Req() request: AuthRequest, @Query() query: ReportQueryDto) {
+  list(
+    @Req() request: AuthRequest,
+    @ValidatedQuery(ReportQueryDto) query: ReportQueryDto,
+  ) {
     return this.reports.list(currentUser(request), query);
   }
   @Get(':id')
@@ -52,7 +48,7 @@ export class ReportsController {
     summary:
       'Full project report, including history, comments and file metadata',
   })
-  detail(@Req() request: AuthRequest, @Param('id', ParseUUIDPipe) id: string) {
+  detail(@Req() request: AuthRequest, @UuidParam('id') id: string) {
     return this.reports.detail(currentUser(request), id);
   }
 }

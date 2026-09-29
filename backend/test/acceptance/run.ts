@@ -18,8 +18,19 @@ async function json(url: string, init: RequestInit = {}) {
     ...init,
     signal: AbortSignal.timeout(120000),
   });
-  if (!response.ok)
-    throw new Error('HTTP_' + response.status + '_' + new URL(url).pathname);
+  if (!response.ok) {
+    const error = (await response.json().catch(() => ({}))) as {
+      message?: unknown;
+    };
+    throw new Error(
+      'HTTP_' +
+        response.status +
+        '_' +
+        new URL(url).pathname +
+        '_' +
+        JSON.stringify(error.message),
+    );
+  }
   return response.json() as Promise<Record<string, unknown>>;
 }
 const admin = await json(kc + '/realms/master/protocol/openid-connect/token', {
@@ -169,9 +180,13 @@ try {
       name: 'Программа подготовки специалистов с длинным названием для проверки кириллицы',
     },
   });
+  // Deterministic fixture IDs must have valid version/variant bits, just like application UUIDs.
+  await db.prisma.$executeRawUnsafe(
+    `CREATE FUNCTION acceptance_uuid(value text) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$ SELECT overlay(overlay(md5(value) placing '4' from 13 for 1) placing '8' from 17 for 1)::uuid $$`,
+  );
   await db.prisma
     .$executeRaw`INSERT INTO universities(id,name,created_by_id,created_at,updated_at)
-    SELECT md5('university-'||i)::uuid, 'Университет '||i, ${author.id}::uuid, now(), now() FROM generate_series(1,1000) i`;
+    SELECT acceptance_uuid('university-'||i)::uuid, 'Университет '||i, ${author.id}::uuid, now(), now() FROM generate_series(1,1000) i`;
   for (const [i, person] of identities.entries()) {
     await db.prisma
       .$executeRaw`INSERT INTO university_assignments(university_id,user_id)
@@ -179,7 +194,7 @@ try {
   }
   await db.prisma
     .$executeRaw`INSERT INTO projects(id,university_id,direction_id,program_id,responsible_id,created_by_id,current_stage_index,created_at,updated_at,closed_at)
-    SELECT md5('project-'||i)::uuid,md5('university-'||((i-1)%1000+1))::uuid,${direction.id}::uuid,${program.id}::uuid,
+    SELECT acceptance_uuid('project-'||i)::uuid,acceptance_uuid('university-'||((i-1)%1000+1))::uuid,${direction.id}::uuid,${program.id}::uuid,
     ${author.id}::uuid,${author.id}::uuid,0,timestamp '2026-01-01'+(i%240)*interval '1 day',now(),
     CASE WHEN i%3=0 THEN timestamp '2026-09-01' ELSE NULL END FROM generate_series(1,10000) i`;
   // Spread responsibilities in addition to the university assignment scope.
@@ -188,10 +203,10 @@ try {
       .$executeRaw`UPDATE projects SET responsible_id=${person.id}::uuid WHERE mod(abs(hashtext(id::text)),50)=${i}`;
   await db.prisma
     .$executeRaw`INSERT INTO project_stages(id,project_id,position,title,expected_actor)
-    SELECT md5('stage-'||id)::uuid,id,0,'Согласование документов',CASE WHEN abs(hashtext(id::text))%2=0 THEN 'KAM'::"ExpectedActor" ELSE 'UNIVERSITY'::"ExpectedActor" END FROM projects`;
+    SELECT acceptance_uuid('stage-'||id)::uuid,id,0,'Согласование документов',CASE WHEN abs(hashtext(id::text))%2=0 THEN 'KAM'::"ExpectedActor" ELSE 'UNIVERSITY'::"ExpectedActor" END FROM projects`;
   await db.prisma
     .$executeRaw`INSERT INTO project_events(id,project_id,actor_id,type,object_type,object_id,created_at)
-    SELECT md5('event-'||i)::uuid,md5('project-'||((i-1)%10000+1))::uuid,${author.id}::uuid,'PROJECT_UPDATED','PROJECT',md5('project-'||((i-1)%10000+1))::uuid,
+    SELECT acceptance_uuid('event-'||i)::uuid,acceptance_uuid('project-'||((i-1)%10000+1))::uuid,${author.id}::uuid,'PROJECT_UPDATED','PROJECT',acceptance_uuid('project-'||((i-1)%10000+1))::uuid,
     timestamp '2026-01-01'+(i%270)*interval '1 day' FROM generate_series(1,200000) i`;
   await db.prisma.$executeRawUnsafe('ANALYZE');
   const plans = await db.prisma
@@ -211,28 +226,105 @@ try {
   );
   const durations: number[] = [],
     failures: string[] = [];
-  const firstProject = await db.prisma.project.findFirstOrThrow({
+  const timings = new Map<string, number[]>();
+  const pollingDurations: number[] = [];
+  function record(operation: string, duration: number) {
+    durations.push(duration);
+    const samples = timings.get(operation) ?? [];
+    samples.push(duration);
+    timings.set(operation, samples);
+  }
+  const mutationProjects = new Map<string, { id: string; stages: string[] }>();
+  // Reuse 50 of the fixture's projects; every actor owns an open project with enough stages for three load rounds.
+  const picked = await db.prisma.project.findMany({
+    take: 50,
+    orderBy: { id: 'asc' },
     select: { id: true },
   });
-  const paths = [
-    '/dashboard',
-    '/reports/projects?page=2&pageSize=25',
-    '/reports/projects?dateFrom=2026-03-01&dateTo=2026-03-31',
-    '/projects/' + firstProject.id,
-  ];
+  for (const [index, person] of identities.entries()) {
+    const projectId = picked[index].id;
+    await db.prisma.project.update({
+      where: { id: projectId },
+      data: { responsibleId: person.id, closedAt: null },
+    });
+    await db.prisma.projectStage.createMany({
+      data: Array.from({ length: 20 }, (_, i) => ({
+        projectId,
+        position: i + 1,
+        title: 'Этап ' + (i + 1),
+      })),
+    });
+    const stages = await db.prisma.projectStage.findMany({
+      where: { projectId },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
+    mutationProjects.set(person.id, {
+      id: projectId,
+      stages: stages.map((s) => s.id),
+    });
+  }
+  const transitionCounts = new Map<string, number>();
   async function load() {
     await Promise.all(
       identities.map(async (person) => {
-        for (let i = 0; i < 20; i++) {
-          const path =
-            person.role === 'kam' ? '/dashboard' : paths[i % paths.length];
+        const own = mutationProjects.get(person.id)!;
+        const auth = {
+          authorization: 'Bearer ' + person.token,
+          'content-type': 'application/json',
+        };
+        async function measured(
+          operation: string,
+          path: string,
+          method = 'GET',
+          body?: unknown,
+        ) {
           const started = performance.now();
           const response = await fetch(api + path, {
-            headers: { authorization: 'Bearer ' + person.token },
+            method,
+            headers: auth,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: AbortSignal.timeout(15000),
           });
-          await response.arrayBuffer();
-          durations.push(performance.now() - started);
-          if (!response.ok) failures.push(String(response.status));
+          const value = await response.json();
+          record(operation, performance.now() - started);
+          if (!response.ok) failures.push(operation + ':' + response.status);
+          return value as Record<string, unknown>;
+        }
+        for (let i = 0; i < 5; i++) {
+          await measured('dashboard', '/dashboard');
+          await measured('project-list', '/projects?page=1&pageSize=25');
+          if (person.role !== 'kam')
+            await measured(
+              'report-list',
+              '/reports/projects?dateFrom=2026-03-01&dateTo=2026-03-31',
+            );
+          await measured('project-card', '/projects/' + own.id);
+          const position = transitionCounts.get(person.id) ?? 0;
+          await measured(
+            'stage-advance',
+            '/projects/' + own.id + '/advance',
+            'POST',
+            { expectedStageId: own.stages[position] },
+          );
+          transitionCounts.set(person.id, position + 1);
+          const comment = await measured(
+            'comment-create',
+            '/projects/' + own.id + '/comments',
+            'POST',
+            { body: 'Нагрузочная проверка ' + i },
+          );
+          await measured(
+            'comment-edit',
+            '/projects/' + own.id + '/comments/' + comment.id,
+            'PATCH',
+            { body: 'Изменённый комментарий ' + i },
+          );
+          await measured(
+            'comment-delete',
+            '/projects/' + own.id + '/comments/' + comment.id,
+            'DELETE',
+          );
         }
       }),
     );
@@ -242,7 +334,7 @@ try {
     for (;;) {
       const started = performance.now();
       const state = await json(api + '/jobs/' + id, { headers });
-      durations.push(performance.now() - started);
+      pollingDurations.push(performance.now() - started);
       if (state.status === wanted) return state;
       if (state.status === 'FAILED' || Date.now() > until)
         throw new Error('JOB_' + String(state.errorCode ?? 'TIMEOUT'));
@@ -251,6 +343,86 @@ try {
   }
   const firstUniversity = await db.prisma.university.findFirstOrThrow({
     select: { id: true },
+  });
+  // Verify the runtime client can read employees but cannot administer Keycloak.
+  const { KeycloakDirectoryAdapter } =
+    await import('../../src/integrations/keycloak/directory.adapter.js');
+  const directory = new KeycloakDirectoryAdapter();
+  assert.equal((await directory.listKam()).length, 25);
+  const serviceToken = await json(
+    kc + '/realms/crm/protocol/openid-connect/token',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: process.env.KEYCLOAK_SERVICE_CLIENT_ID!,
+        client_secret: process.env.KEYCLOAK_SERVICE_CLIENT_SECRET!,
+      }),
+    },
+  );
+  assert.equal(
+    (
+      await fetch(kc + '/admin/realms/crm/users', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + String(serviceToken.access_token),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ username: 'must-not-be-created' }),
+      })
+    ).status,
+    403,
+  );
+  const restricted = identities[25],
+    selectedProject = mutationProjects.get(restricted.id)!;
+  const kamHeaders = {
+    authorization: 'Bearer ' + restricted.token,
+    'content-type': 'application/json',
+  };
+  const visibilityUrl = api + '/visibility/' + restricted.subject;
+  assert.equal(
+    (await fetch(visibilityUrl, { headers: kamHeaders })).status,
+    403,
+  );
+  await json(visibilityUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ mode: 'ALL' }),
+  });
+  assert.equal(
+    (await json(api + '/projects', { headers: kamHeaders })).total,
+    10000,
+  );
+  await json(visibilityUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({
+      mode: 'SELECTED',
+      projectIds: [selectedProject.id],
+    }),
+  });
+  assert.equal(
+    (await json(api + '/projects', { headers: kamHeaders })).total,
+    1,
+  );
+  await json(visibilityUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ mode: 'SELECTED' }),
+  });
+  assert.equal(
+    (await json(api + '/projects', { headers: kamHeaders })).total,
+    0,
+  );
+  assert.equal(
+    (await json(api + '/dashboard', { headers: kamHeaders })).activeProjects,
+    0,
+  );
+  await json(visibilityUrl, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ mode: 'ASSIGNED' }),
   });
   const exports = await Promise.all(
     Array.from({ length: 10 }, (_, i) =>
@@ -375,6 +547,22 @@ try {
   );
   const sorted = [...durations].sort((a, b) => a - b);
   const p95 = sorted[Math.ceil(sorted.length * 0.95) - 1];
+  const operations = Object.fromEntries(
+    [...timings].map(([operation, samples]) => {
+      const values = [...samples].sort((a, b) => a - b);
+      return [
+        operation,
+        {
+          requests: values.length,
+          p95Ms: values[Math.ceil(values.length * 0.95) - 1],
+          maxMs: values.at(-1),
+        },
+      ];
+    }),
+  );
+  const interactivePassed =
+    Object.values(operations).every((value) => value.p95Ms <= 1000) &&
+    failures.length === 0;
   const result = {
     platform: process.platform,
     cpuLimit:
@@ -385,10 +573,15 @@ try {
     requests: durations.length,
     p95Ms: p95,
     failures,
+    operations,
+    polling: {
+      requests: pollingDurations.length,
+      separateFromInteractive: true,
+    },
     previewMs,
     applyMs,
     exports: exportStates.slice(1),
-    interactivePassed: p95 <= 1000 && failures.length === 0,
+    interactivePassed,
   };
   await writeFile(artifacts + '/load.json', JSON.stringify(result, null, 2));
   const queue = new Queue('crm-exports', { connection: redisConnection() });
@@ -435,7 +628,7 @@ try {
     JSON.stringify(openapi, null, 2),
   );
   assert.equal(failures.length, 0);
-  assert.ok(p95 <= 1000, 'Interactive p95 exceeds 1 second');
+  assert.ok(interactivePassed, 'An interactive operation p95 exceeds 1 second');
   console.log(
     JSON.stringify({
       result: 'PASSED',

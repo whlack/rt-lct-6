@@ -20,12 +20,16 @@ trap cleanup EXIT HUP INT TERM
 if [ "$1" = '--local' ]; then
   docker build -f "$ROOT_DIR/backend/Dockerfile" --target production -t rt-crm-api:acceptance "$ROOT_DIR"
   docker build -f "$ROOT_DIR/backend/Dockerfile" --target worker-production -t rt-crm-worker:acceptance "$ROOT_DIR"
+  docker build -f "$ROOT_DIR/backend/Dockerfile" --target tooling -t rt-crm-tooling:acceptance "$ROOT_DIR"
+  TOOLING_IMAGE=rt-crm-tooling:acceptance
   API_IMAGE=rt-crm-api:acceptance
   WORKER_IMAGE=rt-crm-worker:acceptance
 else
   compose config --format json > "$TEST_DIR/server.json"
   API_IMAGE=$(docker run --rm -v "$TEST_DIR:/input:ro" node:24-bookworm-slim node -e 'console.log(JSON.parse(require("fs").readFileSync("/input/server.json")).services.backend.image)')
   WORKER_IMAGE=$(docker run --rm -v "$TEST_DIR:/input:ro" node:24-bookworm-slim node -e 'console.log(JSON.parse(require("fs").readFileSync("/input/server.json")).services.worker.image)')
+  TOOLING_IMAGE=$(docker run --rm -v "$TEST_DIR:/input:ro" node:24-bookworm-slim node -e 'console.log(JSON.parse(require("fs").readFileSync("/input/server.json")).services.migrate.image)')
+  docker pull "$TOOLING_IMAGE"
   docker pull "$API_IMAGE"
   docker pull "$WORKER_IMAGE"
 fi
@@ -35,7 +39,7 @@ if [ "$(docker info --format '{{.NCPU}}')" -lt 6 ]; then
 fi
 cp "$ROOT_DIR/.env.example" "$TEST_DIR/.env"
 docker compose --project-directory "$ROOT_DIR" --env-file "$TEST_DIR/.env" -f "$ROOT_DIR/docker-compose.yaml.example" --profile migration config --format json > "$TEST_DIR/base.json"
-docker run --rm -v "$TEST_DIR:/input" -e API_IMAGE="$API_IMAGE" -e WORKER_IMAGE="$WORKER_IMAGE" node:24-bookworm-slim node -e '
+docker run --rm -v "$TEST_DIR:/input" -e API_IMAGE="$API_IMAGE" -e WORKER_IMAGE="$WORKER_IMAGE" -e TOOLING_IMAGE="$TOOLING_IMAGE" node:24-bookworm-slim node -e '
 const fs = require("fs");
 const model = JSON.parse(fs.readFileSync("/input/base.json"));
 delete model.name;
@@ -46,9 +50,9 @@ for (const service of [model.services.backend, model.services.worker]) {
   service.environment.KEYCLOAK_PUBLIC_URL="http://keycloak:8080";
 }
 model.services.backend.image=process.env.API_IMAGE;
-model.services.backend.command=["pnpm", "start:prod"];
+model.services.backend.command=["node", "dist/main.js"];
 model.services.worker.image=process.env.WORKER_IMAGE;
-model.services.worker.command=["pnpm", "worker:prod"];
+model.services.worker.command=["node", "dist/worker.js"];
 // All application containers share the same four CPUs, as on a four-vCPU host.
 // Per-service quotas would strand idle capacity and distort the acceptance profile.
 for (const service of Object.values(model.services)) {
@@ -63,8 +67,8 @@ model.services.keycloak.mem_limit="1g";
 model.services.redis.mem_limit="256m";
 model.services.minio.mem_limit="1g";
 model.services.migrate.cpuset="4-5";
-for (const name of ["migrate", "keycloak-config", "minio-setup"]) model.services[name].image=process.env.API_IMAGE;
-model.services.migrate.environment={...model.services.backend.environment};
+for (const name of ["migrate", "keycloak-config", "minio-setup"]) model.services[name].image=process.env.TOOLING_IMAGE;
+model.services.migrate.environment={...model.services.backend.environment, KEYCLOAK_ADMIN:model.services.keycloak.environment.KC_BOOTSTRAP_ADMIN_USERNAME, KEYCLOAK_ADMIN_PASSWORD:model.services.keycloak.environment.KC_BOOTSTRAP_ADMIN_PASSWORD};
 for (const volume of Object.values(model.volumes)) delete volume.name;
 for (const network of Object.values(model.networks)) delete network.name;
 fs.writeFileSync("/input/compose.json", JSON.stringify(model));'
@@ -75,6 +79,9 @@ start_service() {
 test_compose config --quiet
 test_compose --profile migration run --rm migrate
 test_compose --profile migration run --rm migrate
+# Ordinary worker is stopped: contract/queue tests own the isolated crm-sync queue.
+test_compose up --wait --wait-timeout 120 redis
+test_compose run --rm --no-deps -e ACCEPTANCE_ISOLATED=1 migrate pnpm test:integration
 test_compose exec -T postgres sh -ec 'createdb -U "$POSTGRES_USER" migration_check'
 for migration in "$ROOT_DIR"/backend/prisma/migrations/20260927*/migration.sql; do
   test_compose exec -T postgres sh -ec 'psql -U "$POSTGRES_USER" -d migration_check -v ON_ERROR_STOP=1' < "$migration" >/dev/null

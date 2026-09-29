@@ -1,3 +1,4 @@
+import { CommonModule } from '../../common/common.module.js';
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module.js';
 import { AuthModule } from '../auth/index.js';
@@ -9,7 +10,7 @@ import { ProjectFileService } from './services/project-file.service.js';
 import { S3Adapter } from '../../integrations/storage/s3.adapter.js';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, UniversitiesModule],
+  imports: [CommonModule, DatabaseModule, AuthModule, UniversitiesModule],
   controllers: [ProjectsController],
   providers: [ProjectRepository, ProjectService, ProjectFileService, S3Adapter],
   exports: [ProjectService, ProjectRepository],

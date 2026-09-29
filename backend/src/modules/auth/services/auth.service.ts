@@ -9,7 +9,10 @@ export class AuthService {
     @Inject(KeycloakTokenAdapter)
     private readonly tokens: Pick<KeycloakTokenAdapter, 'verify'>,
     @Inject(UserRepository)
-    private readonly users: Pick<UserRepository, 'ensure' | 'name'>,
+    private readonly users: Pick<
+      UserRepository,
+      'ensure' | 'name' | 'visibility'
+    >,
   ) {}
 
   async authenticate(token: string): Promise<AuthUser> {
@@ -29,6 +32,7 @@ export class AuthService {
       level,
       email: payload.email,
       name: await this.users.name(id),
+      visibility: await this.users.visibility(id),
     };
   }
 
@@ -38,6 +42,10 @@ export class AuthService {
       return 20;
     if (roles.includes(process.env.KEYCLOAK_KAM_ROLE ?? 'kam')) return 10;
     return null;
+  }
+
+  visibilityFor(id: string) {
+    return this.users.visibility(id);
   }
 
   ensureUser(subject: string): Promise<string> {

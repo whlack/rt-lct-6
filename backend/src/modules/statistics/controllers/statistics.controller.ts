@@ -1,13 +1,8 @@
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Inject,
-  Post,
-  Query,
-  Req,
-} from '@nestjs/common';
+  ValidatedBody,
+  ValidatedQuery,
+} from '../../../common/validated-input.js';
+import { Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -24,8 +19,9 @@ import {
 import { ReportFiltersDto } from '../../reports/index.js';
 import { StatisticsService } from '../services/statistics.service.js';
 export class StatisticsExportDto extends ReportFiltersDto {
-  @ApiProperty({ enum: ['png', 'pdf'] }) @IsIn(['png', 'pdf']) format!:
-    'png' | 'pdf';
+  @ApiProperty({ type: String, enum: ['png', 'pdf'] })
+  @IsIn(['png', 'pdf'])
+  format!: 'png' | 'pdf';
 }
 @ApiTags('statistics')
 @ApiBearerAuth()
@@ -77,7 +73,10 @@ export class StatisticsController {
       },
     },
   })
-  get(@Req() request: AuthRequest, @Query() filters: ReportFiltersDto) {
+  get(
+    @Req() request: AuthRequest,
+    @ValidatedQuery(ReportFiltersDto) filters: ReportFiltersDto,
+  ) {
     return this.service.get(currentUser(request), filters);
   }
   @Post('exports')
@@ -91,7 +90,10 @@ export class StatisticsController {
       },
     },
   })
-  create(@Req() request: AuthRequest, @Body() body: StatisticsExportDto) {
+  create(
+    @Req() request: AuthRequest,
+    @ValidatedBody(StatisticsExportDto) body: StatisticsExportDto,
+  ) {
     return this.service.create(currentUser(request), body);
   }
 }

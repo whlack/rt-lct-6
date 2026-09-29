@@ -13,6 +13,9 @@ model User {
   displayName         String?                @map("display_name")
   displayNameOverride String?                @map("display_name_override")
   email               String?
+  visibilityMode      VisibilityMode         @default(ASSIGNED) @map("visibility_mode")
+  visibleUniversities KamVisibleUniversity[]
+  visibleProjects     KamVisibleProject[]
   createdAt           DateTime               @default(now()) @map("created_at")
   universities        University[]           @relation("UniversityCreator")
   assignments         UniversityAssignment[]
@@ -23,6 +26,7 @@ model User {
   files               ProjectFile[]
   events              ProjectEvent[]
   exportJobs          ExportJob[]
+  syncRuns            IntegrationSyncRun[]
   importJobs          ImportJob[]
 
   @@map("users")
@@ -75,6 +79,7 @@ model University {
   contacts         UniversityContact[]    @relation("UniversityContacts")
   assignments      UniversityAssignment[]
   projects         Project[]
+  visibilityGrants KamVisibleUniversity[]
   createdById      String                 @map("created_by_id") @db.Uuid
   createdBy        User                   @relation("UniversityCreator", fields: [createdById], references: [id])
   createdAt        DateTime               @default(now()) @map("created_at")
@@ -126,35 +131,36 @@ enum FileStatus {
 }
 
 model Project {
-  id                 String             @id @default(uuid()) @db.Uuid
-  universityId       String             @map("university_id") @db.Uuid
-  university         University         @relation(fields: [universityId], references: [id])
-  directionId        String             @map("direction_id") @db.Uuid
-  direction          Direction          @relation(fields: [directionId], references: [id])
-  programId          String?            @map("program_id") @db.Uuid
-  program            Program?           @relation(fields: [programId], references: [id], onDelete: Restrict)
-  productId          String?            @map("product_id") @db.Uuid
-  product            Product?           @relation(fields: [productId], references: [id], onDelete: Restrict)
-  responsibleId      String             @map("responsible_id") @db.Uuid
-  responsible        User               @relation("ProjectResponsible", fields: [responsibleId], references: [id])
-  supervisorId       String?            @map("supervisor_id") @db.Uuid
-  supervisor         User?              @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
-  createdById        String             @map("created_by_id") @db.Uuid
-  createdBy          User               @relation("ProjectCreator", fields: [createdById], references: [id])
+  id                 String              @id @default(uuid()) @db.Uuid
+  universityId       String              @map("university_id") @db.Uuid
+  university         University          @relation(fields: [universityId], references: [id])
+  directionId        String              @map("direction_id") @db.Uuid
+  direction          Direction           @relation(fields: [directionId], references: [id])
+  programId          String?             @map("program_id") @db.Uuid
+  program            Program?            @relation(fields: [programId], references: [id], onDelete: Restrict)
+  productId          String?             @map("product_id") @db.Uuid
+  product            Product?            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  responsibleId      String              @map("responsible_id") @db.Uuid
+  responsible        User                @relation("ProjectResponsible", fields: [responsibleId], references: [id])
+  supervisorId       String?             @map("supervisor_id") @db.Uuid
+  supervisor         User?               @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  createdById        String              @map("created_by_id") @db.Uuid
+  createdBy          User                @relation("ProjectCreator", fields: [createdById], references: [id])
   vendor             String?
-  contractNumber     String?            @map("contract_number")
-  licenseSignedAt    DateTime?          @map("license_signed_at") @db.Date
-  licenseExpiresYear Int?               @map("license_expires_year")
-  transferStatus     TransferStatus     @default(NOT_STARTED) @map("transfer_status")
-  currentStageIndex  Int                @default(0) @map("current_stage_index")
-  workflowLocked     Boolean            @default(false) @map("workflow_locked")
-  closedAt           DateTime?          @map("closed_at")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  contractNumber     String?             @map("contract_number")
+  licenseSignedAt    DateTime?           @map("license_signed_at") @db.Date
+  licenseExpiresYear Int?                @map("license_expires_year")
+  transferStatus     TransferStatus      @default(NOT_STARTED) @map("transfer_status")
+  currentStageIndex  Int                 @default(0) @map("current_stage_index")
+  workflowLocked     Boolean             @default(false) @map("workflow_locked")
+  closedAt           DateTime?           @map("closed_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
   stages             ProjectStage[]
   comments           ProjectComment[]
   events             ProjectEvent[]
   exportJobs         ExportJobProject[]
+  visibilityGrants   KamVisibleProject[]
 
   @@index([universityId])
   @@index([responsibleId])
@@ -339,4 +345,72 @@ model ImportRow {
   @@unique([jobId, sheet, rowNumber])
   @@index([jobId, processedAt])
   @@map("import_rows")
+}
+
+enum IntegrationSource {
+  LMS
+  WEBSITE
+}
+
+enum SyncTrigger {
+  MANUAL
+  SCHEDULED
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model IntegrationSyncRun {
+  id            String            @id @default(uuid()) @db.Uuid
+  source        IntegrationSource
+  trigger       SyncTrigger
+  initiatorId   String?           @map("initiator_id") @db.Uuid
+  initiator     User?             @relation(fields: [initiatorId], references: [id], onDelete: SetNull)
+  status        SyncStatus        @default(QUEUED)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  startedAt     DateTime?         @map("started_at")
+  completedAt   DateTime?         @map("completed_at")
+  attempts      Int               @default(0)
+  nextAttemptAt DateTime          @default(now()) @map("next_attempt_at")
+  errorCode     String?           @map("error_code")
+  executionId   String?           @map("execution_id") @db.Uuid
+  leaseUntil    DateTime?         @map("lease_until")
+  deliveredAt   DateTime?         @map("delivered_at")
+  scheduledAt   DateTime?         @map("scheduled_at")
+
+  @@unique([source, scheduledAt])
+  @@index([source, createdAt, id])
+  @@index([status, nextAttemptAt, leaseUntil])
+  @@map("integration_sync_runs")
+}
+
+// Explicit grants replace assignments only for SELECTED KAM policies.
+enum VisibilityMode {
+  ASSIGNED
+  ALL
+  SELECTED
+}
+
+model KamVisibleUniversity {
+  userId       String     @map("user_id") @db.Uuid
+  universityId String     @map("university_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, universityId])
+  @@map("kam_visible_universities")
+}
+
+model KamVisibleProject {
+  userId    String  @map("user_id") @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("kam_visible_projects")
 }

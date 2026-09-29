@@ -33,5 +33,5 @@ docker exec -i "$RESTORE_ID-postgres" pg_restore -U postgres --no-owner --no-acl
 docker exec -i "$RESTORE_ID-postgres" pg_restore -U postgres --no-owner --no-acl -d keycloak_restore < "$BACKUP_PATH/keycloak.dump"
 docker exec "$RESTORE_ID-postgres" psql -U postgres -d crm_restore -c 'SELECT count(*) AS restored_projects FROM projects'
 docker run --rm --network "$RESTORE_ID" -e S3_ENDPOINT="http://$RESTORE_ID-minio:9000" -e S3_REGION=us-east-1 -e S3_BUCKET=crm-restore -e S3_ACCESS_KEY=restore-user -e S3_SECRET_KEY=isolated-restore-password "$API_IMAGE" node scripts/create-bucket.mjs
-docker run --rm --network "$RESTORE_ID" -v "$BACKUP_PATH:/backup:ro" -e S3_ENDPOINT="http://$RESTORE_ID-minio:9000" -e S3_REGION=us-east-1 -e S3_BUCKET=crm-restore -e S3_ACCESS_KEY=restore-user -e S3_SECRET_KEY=isolated-restore-password "$API_IMAGE" node scripts/backup.mjs restore
+docker run --rm --user "$(id -u):$(id -g)" --network "$RESTORE_ID" -v "$BACKUP_PATH:/backup:ro" -e S3_ENDPOINT="http://$RESTORE_ID-minio:9000" -e S3_REGION=us-east-1 -e S3_BUCKET=crm-restore -e S3_ACCESS_KEY=restore-user -e S3_SECRET_KEY=isolated-restore-password "$API_IMAGE" node scripts/backup.mjs restore
 echo 'Isolated PostgreSQL and S3 restoration verified.'

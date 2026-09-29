@@ -126,7 +126,7 @@ export class ProjectFileService {
       const stage = locked.project.stages[locked.project.currentStageIndex];
       const file = stage?.files.find((item) => item.id === fileId);
       if (!file) throw new NotFoundException('File not found on current stage');
-      if (file.status === 'COMPLETED') return file;
+      if (file.status === 'COMPLETED') return { ...file, stageId: stage.id };
       const updated = await locked.completeFile(fileId);
       await locked.event({
         actorId: user.id,

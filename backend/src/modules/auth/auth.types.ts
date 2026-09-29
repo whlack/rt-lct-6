@@ -1,9 +1,15 @@
+export interface VisibilityPolicy {
+  mode: 'ASSIGNED' | 'ALL' | 'SELECTED';
+  universityIds: string[];
+  projectIds: string[];
+}
 export interface AuthUser {
   id: string;
   subject: string;
   level: 10 | 20 | 30;
   email?: string;
   name?: string;
+  visibility?: VisibilityPolicy;
 }
 
 export interface AuthRequest {

@@ -14,7 +14,7 @@ scripts/stop.sh --local
 
 Миграция выполняется отдельным профилем, запуск сервисов её не выполняет. Stop сохраняет тома. Источники локально подключаются только к API/worker; серверные образы запускаются без bind mount исходников.
 
-Для сервера собрать и опубликовать два образа из backend/Dockerfile: target `production` для API и target `worker-production` для worker. Зафиксировать теги или digest в серверном `docker-compose.prod.yaml`; для migrate, keycloak-config и minio-setup использовать образ API той же версии. У backend — команда `pnpm start:prod`, у worker — `pnpm worker:prod`, у migrate — `prisma migrate deploy`, затем `prisma db seed`. Убрать build и исходные bind mounts. Имена сервисов backend/worker/postgres/redis/keycloak сохраняются для scripts.
+Для сервера собрать и опубликовать три образа из backend/Dockerfile: target `production` для API и target `worker-production` для worker и target `tooling` для миграций и настройки. Зафиксировать теги или digest в серверном `docker-compose.prod.yaml`; для migrate, keycloak-config и minio-setup использовать образ tooling той же версии. API и worker работают как node, с production-зависимостями и без tsx/линтера; setup остаётся отдельным одноразовым контейнером. Prisma/TypeScript сохраняются в транзитивном peer-дереве @prisma/client, без прямых команд приложения. У backend — команда `node dist/main.js`, у worker — `node dist/worker.js` (либо оставить CMD production-образа; прямой запуск Node обеспечивает передачу SIGTERM), у migrate — `prisma migrate deploy`, затем `prisma db seed`. Убрать build и исходные bind mounts. Имена сервисов backend/worker/postgres/redis/keycloak сохраняются для scripts.
 
 Worker включает Chromium headless shell, системные библиотеки и DejaVu Sans с кириллицей. Браузер устанавливается при сборке, по [инструкции Playwright](https://playwright.dev/docs/browsers). Сеть при рендеринге запрещена; шрифт встроен в HTML. Начальные ограничения worker: 2 CPU, 2 ГБ RAM, две выгрузки и один импорт, graceful shutdown до 120 секунд. При превышении срока Docker завершает процесс; lease и построчные транзакции позволяют повтор.
 
@@ -71,3 +71,11 @@ API возвращает x-request-id; журнал содержит request/job
 Архитектурная модель: [crm-stage2.archimate](architecture/crm-stage2.archimate). Проверена загрузкой, сохранением и генерацией трёх представлений в Archi 5.10.0.
 
 [Результаты серверной проверки и оставшаяся приёмка](stage2-acceptance.md).
+
+## Ограничения ресурсов и сервисный доступ
+
+API/worker используют client_credentials клиента crm-directory, которому bootstrap назначает только realm-management view-users/query-users/view-realm и соответствующие scope mappings. view-realm необходим для чтения участников ролей в Keycloak 26.4; права manage-* отсутствуют. Пароль администратора не передаётся runtime. Запросы каталога имеют таймаут и постраничный обход; секрет задаётся в `.env` и может ротироваться повторным keycloak-config.
+
+`MAX_ACTIVE_UPLOADS`/`MAX_ACTIVE_UPLOADS_PER_USER` ограничивают буферные загрузки до Multer в каждой реплике API (4/2). PostgreSQL атомарно ограничивает задания: активные выгрузки на сотрудника/глобально — 10/200, сохранённые выгрузки на сотрудника — 100; активные импорты — 2, сохранённые — 10. Значения меняются через `.env`; PREVIEW импорта занимает активное место до apply или истечения. Ответ 429 означает превышение бюджета. Реплики API не разделяют счётчик загрузок; при масштабировании согласуйте общий лимит reverse proxy.
+
+Все записи результата и ошибок импорта проверяют executionId и действующую lease. Потерявший аренду worker прекращает новые строки и не может продлить истёкшую аренду или завершить чужое задание. Health worker учитывает crm-sync вместе с очередями импорта/выгрузок. Backup/restore выполняются с UID/GID запускающего пользователя, чтобы закрытые каталоги с правами 0700 оставались доступны после перехода runtime на непривилегированного пользователя.

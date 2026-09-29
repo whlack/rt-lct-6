@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Inject, Param, Patch } from '@nestjs/common';
+import { ValidatedBody } from '../../../common/validated-input.js';
+import { Controller, Get, Inject, Param, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '../../auth/decorators/permissions.decorator.js';
 import { UpdatePermissionDto } from '../dto/update-permission.dto.js';
@@ -19,7 +20,10 @@ export class PermissionsController {
   }
 
   @Patch(':key')
-  update(@Param('key') key: string, @Body() body: UpdatePermissionDto) {
+  update(
+    @Param('key') key: string,
+    @ValidatedBody(UpdatePermissionDto) body: UpdatePermissionDto,
+  ) {
     return this.permissions.update(key, body.minimumLevel);
   }
 }

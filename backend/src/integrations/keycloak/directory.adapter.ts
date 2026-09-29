@@ -36,7 +36,7 @@ export class KeycloakDirectoryAdapter {
     process.env.KEYCLOAK_INTERNAL_URL ?? 'http://keycloak:8080';
 
   async findEmail(email: string): Promise<Employee[]> {
-    const token = await this.adminToken();
+    const token = await this.serviceToken();
     const matches = new Map<string, Employee>();
     for (let first = 0; first < 100000; first += 100) {
       const query = new URLSearchParams({
@@ -82,7 +82,7 @@ export class KeycloakDirectoryAdapter {
   async identity(
     subject: string,
   ): Promise<{ enabled: boolean; roles: string[] }> {
-    const token = await this.adminToken();
+    const token = await this.serviceToken();
     const headers = { authorization: `Bearer ${token}` };
     const [profile, mappings] = await Promise.all([
       fetch(
@@ -114,21 +114,20 @@ export class KeycloakDirectoryAdapter {
     };
   }
 
-  private async adminToken(): Promise<string> {
-    const username = process.env.KEYCLOAK_ADMIN;
-    const password = process.env.KEYCLOAK_ADMIN_PASSWORD;
-    if (!username || !password)
-      throw new Error('Keycloak admin credentials are required');
+  private async serviceToken(): Promise<string> {
+    const clientId = process.env.KEYCLOAK_SERVICE_CLIENT_ID ?? 'crm-directory';
+    const secret = process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
+    if (!secret)
+      throw new Error('Keycloak directory service secret is required');
     const response = await fetch(
-      `${this.base}/realms/master/protocol/openid-connect/token`,
+      `${this.base}/realms/crm/protocol/openid-connect/token`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          grant_type: 'password',
-          client_id: 'admin-cli',
-          username,
-          password,
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: secret,
         }),
         signal: AbortSignal.timeout(10000),
       },
@@ -149,30 +148,34 @@ export class KeycloakDirectoryAdapter {
 
   private async listRole(roleName: string): Promise<Employee[]> {
     try {
-      const token = await this.adminToken();
+      const token = await this.serviceToken();
       const role = encodeURIComponent(roleName);
-      const response = await fetch(
-        `${this.base}/admin/realms/crm/roles/${role}/users?max=1000`,
-        {
-          headers: { authorization: `Bearer ${token}` },
-        },
-      );
-      if (!response.ok) throw new Error('Directory request failed');
-      const body: unknown = await response.json();
-      if (!Array.isArray(body)) throw new Error('Directory response invalid');
-      return body.filter(isAdminUser).flatMap((user) =>
-        user.id && user.email && user.enabled !== false
-          ? [
-              {
-                subject: user.id,
-                email: user.email,
-                name:
-                  [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-                  user.email,
-              },
-            ]
-          : [],
-      );
+      const people = new Map<string, Employee>();
+      for (let first = 0; first < 100000; first += 100) {
+        const response = await fetch(
+          `${this.base}/admin/realms/crm/roles/${role}/users?first=${first}&max=100`,
+          {
+            headers: { authorization: `Bearer ${token}` },
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (!response.ok) throw new Error('Directory request failed');
+        const body: unknown = await response.json();
+        if (!Array.isArray(body) || !body.every(isAdminUser))
+          throw new Error('Directory response invalid');
+        for (const user of body) {
+          if (user.id && user.email && user.enabled !== false)
+            people.set(user.id, {
+              subject: user.id,
+              email: user.email,
+              name:
+                [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+                user.email,
+            });
+        }
+        if (body.length < 100) return [...people.values()];
+      }
+      throw new Error('Directory pagination limit exceeded');
     } catch {
       throw new ServiceUnavailableException('Keycloak directory unavailable');
     }

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { createServer } from 'node:http';
 import { WorkerModule } from './worker/worker.module.js';
+import { SyncWorkerService } from './worker/sync-worker.service.js';
 import { WorkerService } from './worker/worker.service.js';
 import { DatabaseService } from './database/database.service.js';
 import { metrics } from './common/metrics.js';
@@ -9,6 +10,7 @@ import { metrics } from './common/metrics.js';
 const app = await NestFactory.createApplicationContext(WorkerModule);
 app.enableShutdownHooks();
 const worker = app.get(WorkerService);
+const syncWorker = app.get(SyncWorkerService);
 const database = app.get(DatabaseService);
 const server = createServer((request, response) => {
   if (request.url === '/metrics') {
@@ -18,7 +20,7 @@ const server = createServer((request, response) => {
     });
     return;
   }
-  void Promise.all([worker.healthy(), database.isReady()])
+  void Promise.all([worker.healthy(), syncWorker.healthy(), database.isReady()])
     .then((results) => {
       response.writeHead(results.every(Boolean) ? 200 : 503, {
         'content-type': 'application/json',

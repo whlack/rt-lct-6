@@ -1,8 +1,15 @@
-import { Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import type { Prisma } from '../../../generated/prisma/client.js';
 import { DatabaseService } from '../../../database/database.service.js';
 import { publicProfile, type AuthUser } from '../../auth/index.js';
 import { projectScope } from '../project-scope.js';
+import type { PageDto } from '../../../common/page.dto.js';
 
 const projectInclude = {
   university: { select: { id: true, name: true } },
@@ -51,17 +58,11 @@ export class LockedProject {
   ) {}
 
   async hasScope(user: AuthUser): Promise<boolean> {
-    if (user.level >= 20 || this.project.responsibleId === user.id) return true;
-    const assignment = await this.tx.universityAssignment.findUnique({
-      where: {
-        universityId_userId: {
-          universityId: this.project.universityId,
-          userId: user.id,
-        },
-      },
-      select: { userId: true },
-    });
-    return assignment !== null;
+    return (
+      (await this.tx.project.count({
+        where: { AND: [{ id: this.project.id }, projectScope(user)] },
+      })) > 0
+    );
   }
 
   update(data: Prisma.ProjectUpdateInput) {
@@ -127,12 +128,41 @@ export class ProjectRepository {
     @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
-  list(user: AuthUser) {
-    return this.database.prisma.project.findMany({
-      where: projectScope(user),
-      include: projectInclude,
-      orderBy: { createdAt: 'desc' },
-    });
+  list(user: AuthUser, query: PageDto) {
+    const where = projectScope(user);
+    return this.database.prisma.$transaction(
+      async (tx) => {
+        const total = await tx.project.count({ where });
+        const projects = await tx.project.findMany({
+          where,
+          select: {
+            id: true,
+            university: { select: { id: true, name: true } },
+            direction: { select: { id: true, name: true } },
+            program: { select: { id: true, name: true } },
+            product: { select: { id: true, name: true } },
+            responsibleId: true,
+            supervisorId: true,
+            currentStageIndex: true,
+            closedAt: true,
+            createdAt: true,
+            stages: { select: { id: true, position: true, title: true } },
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+        });
+        const rows = projects.map(({ stages, ...project }) => ({
+          ...project,
+          currentStage:
+            stages.find(
+              (stage) => stage.position === project.currentStageIndex,
+            ) ?? null,
+        }));
+        return { rows, total, page: query.page, pageSize: query.pageSize };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 
   find(id: string): Promise<ProjectView | null> {
@@ -248,6 +278,7 @@ export class ProjectRepository {
         comments.map((comment) => ({
           ...comment,
           author: publicProfile(comment.author),
+          body: comment.deletedAt ? null : comment.body,
         })),
       );
   }
@@ -280,46 +311,49 @@ export class ProjectRepository {
     });
   }
 
-  async updateComment(
+  private async mutateComment(
     projectId: string,
     id: string,
-    actorId: string,
-    body: string,
+    user: AuthUser,
+    body: string | null,
   ) {
     return this.database.prisma.$transaction(async (tx) => {
-      const comment = await tx.projectComment.update({
+      // Check deletion and authorship under the same row lock as the write.
+      await tx.$queryRaw`SELECT id FROM project_comments WHERE id = ${id}::uuid FOR UPDATE`;
+      const comment = await tx.projectComment.findUnique({ where: { id } });
+      if (!comment || comment.projectId !== projectId)
+        throw new NotFoundException('Comment not found');
+      if (
+        !(await tx.project.count({
+          where: { AND: [{ id: projectId }, projectScope(user)] },
+        }))
+      )
+        throw new NotFoundException('Project not found');
+      if (comment.deletedAt) throw new ConflictException('Comment was deleted');
+      if (user.level < 20 && comment.authorId !== user.id)
+        throw new ForbiddenException('Comment belongs to another author');
+      const updated = await tx.projectComment.update({
         where: { id },
-        data: { body },
+        data: body === null ? { body: '', deletedAt: new Date() } : { body },
       });
       await tx.projectEvent.create({
         data: {
           projectId,
-          actorId,
-          type: 'COMMENT_UPDATED',
+          actorId: user.id,
+          type: body === null ? 'COMMENT_DELETED' : 'COMMENT_UPDATED',
           objectType: 'comment',
           objectId: id,
         },
       });
-      return comment;
+      return { ...updated, body: updated.deletedAt ? null : updated.body };
     });
   }
 
-  async deleteComment(projectId: string, id: string, actorId: string) {
-    return this.database.prisma.$transaction(async (tx) => {
-      const comment = await tx.projectComment.update({
-        where: { id },
-        data: { body: '', deletedAt: new Date() },
-      });
-      await tx.projectEvent.create({
-        data: {
-          projectId,
-          actorId,
-          type: 'COMMENT_DELETED',
-          objectType: 'comment',
-          objectId: id,
-        },
-      });
-      return comment;
-    });
+  updateComment(projectId: string, id: string, user: AuthUser, body: string) {
+    return this.mutateComment(projectId, id, user, body);
+  }
+
+  deleteComment(projectId: string, id: string, user: AuthUser) {
+    return this.mutateComment(projectId, id, user, null);
   }
 }

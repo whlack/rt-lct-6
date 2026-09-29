@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { PageDto } from '../../../common/page.dto.js';
 import type { AuthUser } from '../../auth/index.js';
 import { AuthService } from '../../auth/index.js';
 import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directory.adapter.js';
@@ -58,8 +59,8 @@ export class ProjectService {
     @Inject(AuthService) private readonly auth: AuthService,
   ) {}
 
-  list(user: AuthUser) {
-    return this.repository.list(user);
+  list(user: AuthUser, query: PageDto) {
+    return this.repository.list(user, query);
   }
 
   async getVisible(user: AuthUser, id: string): Promise<ProjectView> {
@@ -84,8 +85,9 @@ export class ProjectService {
           productId: body.productId,
           responsibleId,
           createdById: user.id,
-          vendor: body.vendor?.trim(),
-          contractNumber: body.contractNumber?.trim(),
+          vendor: body.vendor === null ? null : body.vendor?.trim(),
+          contractNumber:
+            body.contractNumber === null ? null : body.contractNumber?.trim(),
           licenseSignedAt: body.licenseSignedAt
             ? new Date(body.licenseSignedAt)
             : undefined,
@@ -120,11 +122,15 @@ export class ProjectService {
     return this.repository.withLock(id, async (value) => {
       const locked = await this.requireLocked(value, user);
       const data = {
-        vendor: body.vendor?.trim(),
-        contractNumber: body.contractNumber?.trim(),
-        licenseSignedAt: body.licenseSignedAt
-          ? new Date(body.licenseSignedAt)
-          : undefined,
+        vendor: body.vendor === null ? null : body.vendor?.trim(),
+        contractNumber:
+          body.contractNumber === null ? null : body.contractNumber?.trim(),
+        licenseSignedAt:
+          body.licenseSignedAt === null
+            ? null
+            : body.licenseSignedAt
+              ? new Date(body.licenseSignedAt)
+              : undefined,
         licenseExpiresYear: body.licenseExpiresYear,
         transferStatus: body.transferStatus,
       };
@@ -138,7 +144,7 @@ export class ProjectService {
       });
       if (
         body.licenseSignedAt &&
-        body.licenseSignedAt !==
+        new Date(body.licenseSignedAt).toISOString().slice(0, 10) !==
           locked.project.licenseSignedAt?.toISOString().slice(0, 10)
       ) {
         await locked.event({
@@ -277,7 +283,7 @@ export class ProjectService {
   }
 
   async advance(user: AuthUser, id: string, body: AdvanceStageDto) {
-    await this.getVisible(user, id);
+    // Scope and state are checked under the row lock; a preliminary card read duplicates the whole stage graph.
     return this.repository.withLock(id, async (value) => {
       const locked = await this.requireLocked(value, user);
       const current = locked.project.stages[locked.project.currentStageIndex];
@@ -385,13 +391,13 @@ export class ProjectService {
     return this.repository.updateComment(
       projectId,
       commentId,
-      user.id,
+      user,
       body.trim(),
     );
   }
 
   async deleteComment(user: AuthUser, projectId: string, commentId: string) {
     await this.editableComment(user, projectId, commentId);
-    return this.repository.deleteComment(projectId, commentId, user.id);
+    return this.repository.deleteComment(projectId, commentId, user);
   }
 }

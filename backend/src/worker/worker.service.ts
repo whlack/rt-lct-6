@@ -94,10 +94,12 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     const started = performance.now();
     let outcome = 'SUCCEEDED';
     if (kind === 'import') {
-      const input = await this.jobs.database.prisma.importJob.findUnique({
-        where: { id },
-      });
-      if (input && task.data.phase !== input.phase) return;
+      const input = await this.jobs.current('import', id);
+      if (
+        input &&
+        task.data.phase !== ('phase' in input ? input.phase : undefined)
+      )
+        return;
     }
     const executionId = await this.jobs.claim(kind, id);
     if (!executionId) {
@@ -111,10 +113,22 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         return;
       throw new Error('JOB_LEASE_BUSY');
     }
+    const abort = new AbortController();
+    let leaseLost = false;
     const heartbeat = setInterval(() => {
       void this.jobs
         .heartbeat(kind, id, executionId)
-        .catch(() => this.logger.warn('LEASE_HEARTBEAT_FAILED'));
+        .then((result) => {
+          if (!result.count) {
+            leaseLost = true;
+            abort.abort();
+          }
+        })
+        .catch(() => {
+          leaseLost = true;
+          abort.abort();
+          this.logger.warn('LEASE_HEARTBEAT_FAILED');
+        });
     }, 5000);
     let key: string | undefined;
     try {
@@ -127,24 +141,17 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
         if (attempt.attempts > 1) retries.inc({ kind });
       }
       if (kind === 'import') {
-        const input =
-          await this.jobs.database.prisma.importJob.findUniqueOrThrow({
-            where: { id },
-            include: { owner: true },
-          });
+        const input = await this.jobs.importWithOwner(id);
         if (task.data.phase !== input.phase) return;
         const user = await this.identities.resolve(
           input.owner.keycloakSubject,
           'catalogs.import',
         );
-        await this.catalogImports.run(input, executionId, user);
+        await this.catalogImports.run(input, executionId, user, abort.signal);
         this.logger.log({ jobId: id, result: 'IMPORT_COMPLETED' });
         return;
       }
-      const job = await this.jobs.database.prisma.exportJob.findUniqueOrThrow({
-        where: { id },
-        include: { owner: true },
-      });
+      const job = await this.jobs.exportWithOwner(id);
       const user = await this.identities.resolve(
         job.owner.keycloakSubject,
         job.permission,
@@ -154,6 +161,7 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
           ? await this.statistics.run(job, user)
           : await this.reports.run(job, user);
       key = 'exports/' + id + '/' + executionId + '.' + job.format;
+      if (leaseLost) throw new Error('JOB_LEASE_LOST');
       await this.storage.put(key, result.bytes, result.mimeType);
       const committed = await this.jobs.completeExport(id, executionId, {
         key,
@@ -209,8 +217,6 @@ export class WorkerService implements OnModuleInit, OnModuleDestroy {
     await this.imports?.close();
   }
   private current(kind: QueueKind, id: string) {
-    return kind === 'export'
-      ? this.jobs.database.prisma.exportJob.findUnique({ where: { id } })
-      : this.jobs.database.prisma.importJob.findUnique({ where: { id } });
+    return this.jobs.current(kind, id);
   }
 }

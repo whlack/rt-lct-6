@@ -21,5 +21,5 @@ trap resume EXIT HUP INT TERM
 if [ -n "$RUNNING_SERVICES" ]; then compose stop $RUNNING_SERVICES; fi
 compose exec -T postgres sh -ec 'pg_dump -U "$POSTGRES_USER" -d "$CRM_DB" -Fc' > "$BACKUP_PATH/crm.dump"
 compose exec -T postgres sh -ec 'pg_dump -U "$POSTGRES_USER" -d "$KEYCLOAK_DB" -Fc' > "$BACKUP_PATH/keycloak.dump"
-compose run --rm --no-deps -v "$BACKUP_PATH:/backup" backend node scripts/backup.mjs save
+compose run --rm --no-deps --user "$(id -u):$(id -g)" -v "$BACKUP_PATH:/backup" backend node scripts/backup.mjs save
 echo "Backup saved: $BACKUP_PATH"

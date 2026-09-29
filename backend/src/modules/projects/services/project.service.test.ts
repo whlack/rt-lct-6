@@ -134,6 +134,23 @@ test('required documents block transition and simultaneous requests advance once
   );
 });
 
+test('transition checks access and closed state inside the project lock', async () => {
+  const { service, project, events } = harness();
+  await assert.rejects(
+    service.advance({ ...user, id: 'outsider' }, project.id, {
+      expectedStageId: 'first',
+    }),
+    ForbiddenException,
+  );
+  project.closedAt = new Date();
+  await assert.rejects(
+    service.advance(user, project.id, { expectedStageId: 'first' }),
+    ConflictException,
+  );
+  assert.equal(project.currentStageIndex, 0);
+  assert.deepEqual(events, []);
+});
+
 test('workflow cannot be changed after the first transition', async () => {
   const { service, project } = harness();
   project.workflowLocked = true;

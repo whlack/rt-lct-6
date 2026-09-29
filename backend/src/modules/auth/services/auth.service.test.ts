@@ -5,6 +5,11 @@ import { AuthService } from './auth.service.js';
 test('requires a CRM role and maps the highest role level', async () => {
   let capturedProfile: { name?: string; email?: string } | undefined;
   const users = {
+    visibility: async () => ({
+      mode: 'ASSIGNED' as const,
+      universityIds: [],
+      projectIds: [],
+    }),
     name: async () => undefined,
     ensure: async (
       _subject: string,
@@ -31,6 +36,7 @@ test('requires a CRM role and maps the highest role level', async () => {
     level: 20,
     email: undefined,
     name: undefined,
+    visibility: { mode: 'ASSIGNED', universityIds: [], projectIds: [] },
   });
   assert.deepEqual(capturedProfile, { name: undefined, email: undefined });
   await assert.rejects(

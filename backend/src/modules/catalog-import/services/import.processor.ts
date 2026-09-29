@@ -113,23 +113,37 @@ export class ImportProcessor {
     );
     return key;
   }
-  async run(job: ImportJob, executionId: string, user: AuthUser) {
-    const current = await this.repository.database.prisma.importJob.findFirst({
-      where: { id: job.id, executionId, status: 'RUNNING', phase: job.phase },
-    });
+  async run(
+    job: ImportJob,
+    executionId: string,
+    user: AuthUser,
+    signal?: AbortSignal,
+  ) {
+    const current = await this.repository.active(
+      job.id,
+      executionId,
+      job.phase,
+    );
     if (!current) return;
     if (job.expiresAt <= new Date())
       throw new BadRequestException('Import expired');
-    if (job.phase === 'VALIDATE') return this.validate(job, executionId, user);
-    return this.apply(job, executionId, user);
+    if (job.phase === 'VALIDATE')
+      return this.validate(job, executionId, user, signal);
+    return this.apply(job, executionId, user, signal);
   }
-  private async validate(job: ImportJob, executionId: string, user: AuthUser) {
+  private async validate(
+    job: ImportJob,
+    executionId: string,
+    user: AuthUser,
+    signal?: AbortSignal,
+  ) {
     if (!job.sourceKey) throw new BadRequestException('Import source missing');
     const bytes = Buffer.from(await this.storage.get(job.sourceKey));
     if (createHash('sha256').update(bytes).digest('hex') !== job.checksum)
       throw new BadRequestException('Import checksum mismatch');
     const rows = await parseWorkbook(bytes, job.fileName);
     for (const [index, row] of rows.entries()) {
+      signal?.throwIfAborted();
       if (row.action !== 'ERROR' && !row.data.duplicateOf) {
         if (row.sheet === 'Сотрудники') {
           const match = await this.employee(row);
@@ -137,10 +151,9 @@ export class ImportProcessor {
             row.action = 'ERROR';
             row.errors.push(match.error);
           } else if (match.person) {
-            const existing =
-              await this.repository.database.prisma.user.findUnique({
-                where: { keycloakSubject: match.person.subject },
-              });
+            const existing = await this.repository.localEmployee(
+              match.person.subject,
+            );
             row.action = !existing
               ? 'CREATE'
               : existing.displayNameOverride === row.data.fullName
@@ -150,12 +163,11 @@ export class ImportProcessor {
         } else rows[index] = await this.repository.preview(row, user);
       }
       if (index % 100 === 0)
-        await this.repository.database.prisma.importJob.updateMany({
-          where: { id: job.id, executionId, status: 'RUNNING' },
-          data: {
-            progress: Math.floor((index * 95) / Math.max(rows.length, 1)),
-          },
-        });
+        await this.repository.progress(
+          job.id,
+          executionId,
+          Math.floor((index * 95) / Math.max(rows.length, 1)),
+        );
     }
     const key = await this.errorsFile(job.id, executionId, rows);
     try {
@@ -174,14 +186,16 @@ export class ImportProcessor {
       throw error;
     }
   }
-  private async apply(job: ImportJob, executionId: string, user: AuthUser) {
-    const db = this.repository.database.prisma;
-    const rows = await db.importRow.findMany({
-      where: { jobId: job.id, processedAt: null },
-      orderBy: { position: 'asc' },
-    });
-    const total = await db.importRow.count({ where: { jobId: job.id } });
+  private async apply(
+    job: ImportJob,
+    executionId: string,
+    user: AuthUser,
+    signal?: AbortSignal,
+  ) {
+    const rows = await this.repository.rows(job.id, true);
+    const total = await this.repository.rowCount(job.id);
     for (const [index, stored] of rows.entries()) {
+      signal?.throwIfAborted();
       const row = prepared(stored);
       try {
         const match =
@@ -191,55 +205,19 @@ export class ImportProcessor {
             ? await this.employee(row)
             : undefined;
         if (match?.error) {
-          await this.repository.rowError(stored.id, [match.error]);
+          await this.repository.rowError(job.id, executionId, stored.id, [
+            match.error,
+          ]);
           continue;
         }
-        await db.$transaction(async (tx) => {
-          // Lock the row and lease together: a duplicate delivery cannot apply a mutation twice.
-          await tx.$queryRaw`SELECT id FROM import_jobs WHERE id = ${job.id} FOR UPDATE`;
-          const owner = await tx.importJob.findFirst({
-            where: {
-              id: job.id,
-              executionId,
-              status: 'RUNNING',
-              expiresAt: { gt: new Date() },
-            },
-          });
-          if (!owner) throw new ConflictException('Import lease lost');
-          await tx.$queryRaw`SELECT id FROM import_rows WHERE id = ${stored.id} FOR UPDATE`;
-          const current = await tx.importRow.findUniqueOrThrow({
-            where: { id: stored.id },
-          });
-          if (current.processedAt) return;
-          let result = 'SKIPPED';
-          if (row.errors.length) result = 'ERROR';
-          else if (!row.data.duplicateOf) {
-            if (match?.person) {
-              const existing = await tx.user.findUnique({
-                where: { keycloakSubject: match.person.subject },
-              });
-              await tx.user.upsert({
-                where: { keycloakSubject: match.person.subject },
-                create: {
-                  keycloakSubject: match.person.subject,
-                  email: match.person.email,
-                  displayName: match.person.name,
-                  displayNameOverride: String(row.data.fullName),
-                },
-                update: { displayNameOverride: String(row.data.fullName) },
-              });
-              result = !existing
-                ? 'CREATED'
-                : existing.displayNameOverride === row.data.fullName
-                  ? 'SKIPPED'
-                  : 'UPDATED';
-            } else result = await this.repository.applyCatalog(tx, row, user);
-          }
-          await tx.importRow.update({
-            where: { id: stored.id },
-            data: { result, processedAt: new Date() },
-          });
-        });
+        await this.repository.applyRow(
+          job.id,
+          executionId,
+          stored.id,
+          row,
+          user,
+          match?.person,
+        );
       } catch (error) {
         if (error instanceof ConflictException) throw error;
         const dataError =
@@ -256,43 +234,33 @@ export class ImportProcessor {
             message: 'Строка отклонена: изменились данные или доступ',
           },
         ];
-        await this.repository.rowError(stored.id, errors);
+        await this.repository.rowError(job.id, executionId, stored.id, errors);
       } finally {
         if (index % 100 === 0)
-          await db.importJob.updateMany({
-            where: { id: job.id, executionId, status: 'RUNNING' },
-            data: {
-              progress: Math.min(
-                99,
-                Math.floor(
-                  ((total - rows.length + index + 1) * 100) /
-                    Math.max(1, total),
-                ),
+          await this.repository.progress(
+            job.id,
+            executionId,
+            Math.min(
+              99,
+              Math.floor(
+                ((total - rows.length + index + 1) * 100) / Math.max(1, total),
               ),
-            },
-          });
+            ),
+          );
       }
     }
-    const completed = await db.importRow.findMany({
-      where: { jobId: job.id },
-      orderBy: { position: 'asc' },
-    });
+    const completed = await this.repository.rows(job.id);
     const key = await this.errorsFile(
       job.id,
       executionId,
       completed.map(prepared),
     );
-    const result = await db.importJob.updateMany({
-      where: { id: job.id, executionId, status: 'RUNNING' },
-      data: {
-        status: 'SUCCEEDED',
-        progress: 100,
-        completedAt: new Date(),
-        leaseUntil: null,
-        counts: counts(completed, true),
-        resultKey: key,
-      },
-    });
+    const result = await this.repository.complete(
+      job.id,
+      executionId,
+      counts(completed, true),
+      key,
+    );
     if (!result.count) await this.storage.delete(key);
     else if (job.resultKey && job.resultKey !== key)
       await this.storage.delete(job.resultKey);

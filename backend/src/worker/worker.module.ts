@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { IntegrationSyncModule } from '../modules/integration-sync/index.js';
+import { SyncWorkerService } from './sync-worker.service.js';
 import { JobsModule } from '../modules/jobs/index.js';
 import { ReportsModule } from '../modules/reports/index.js';
 import { WorkerService } from './worker.service.js';
@@ -12,8 +14,9 @@ import { StatisticsModule } from '../modules/statistics/index.js';
     ReportsModule,
     CatalogImportModule,
     StatisticsModule,
+    IntegrationSyncModule,
   ],
-  providers: [WorkerService],
+  providers: [WorkerService, SyncWorkerService],
   exports: [WorkerService],
 })
 export class WorkerModule {}

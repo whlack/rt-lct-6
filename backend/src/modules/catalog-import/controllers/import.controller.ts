@@ -1,12 +1,11 @@
+import { UploadLimitInterceptor } from '../../../common/upload-limit.interceptor.js';
+import { UuidParam, ValidatedQuery } from '../../../common/validated-input.js';
 import {
   Controller,
   Get,
   HttpCode,
   Inject,
-  Param,
-  ParseUUIDPipe,
   Post,
-  Query,
   Req,
   UploadedFile,
   UseInterceptors,
@@ -23,7 +22,6 @@ import {
   ApiForbiddenResponse,
   ApiGoneResponse,
   ApiNotFoundResponse,
-  PickType,
   ApiTags,
 } from '@nestjs/swagger';
 import {
@@ -33,11 +31,7 @@ import {
 } from '../../auth/index.js';
 import { positiveInteger } from '../../../config/jobs.js';
 import { ImportService } from '../services/import.service.js';
-import { ReportQueryDto } from '../../reports/index.js';
-class ImportPageDto extends PickType(ReportQueryDto, [
-  'page',
-  'pageSize',
-] as const) {}
+import { PageDto } from '../../../common/page.dto.js';
 @ApiTags('catalog-imports')
 @ApiBearerAuth()
 @RequirePermission('catalogs.import')
@@ -69,8 +63,15 @@ export class ImportController {
     },
   })
   @UseInterceptors(
+    UploadLimitInterceptor,
     FileInterceptor('file', {
-      limits: { fileSize: positiveInteger('IMPORT_MAX_BYTES', 10485760) },
+      limits: {
+        files: 1,
+        fields: 10,
+        parts: 11,
+        fieldSize: 4096,
+        fileSize: positiveInteger('IMPORT_MAX_BYTES', 10485760),
+      },
     }),
   )
   upload(
@@ -142,8 +143,8 @@ export class ImportController {
   })
   get(
     @Req() request: AuthRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: ImportPageDto,
+    @UuidParam('id') id: string,
+    @ValidatedQuery(PageDto) query: PageDto,
   ) {
     return this.imports.get(
       currentUser(request),
@@ -157,7 +158,7 @@ export class ImportController {
   @ApiAcceptedResponse({
     description: 'Valid rows will be rechecked and applied once',
   })
-  apply(@Req() request: AuthRequest, @Param('id', ParseUUIDPipe) id: string) {
+  apply(@Req() request: AuthRequest, @UuidParam('id') id: string) {
     return this.imports.apply(currentUser(request), id);
   }
 }

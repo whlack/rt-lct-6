@@ -58,3 +58,9 @@ export const cleaned = new Counter({
   labelNames: ['kind'],
   registers: [metrics],
 });
+
+export const syncRunsCleaned = new Counter({
+  name: 'crm_sync_runs_cleaned_total',
+  help: 'Expired terminal synchronization audit records deleted',
+  registers: [metrics],
+});

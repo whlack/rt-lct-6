@@ -8,7 +8,7 @@ import type { Prisma } from '../../../generated/prisma/client.js';
 export function exportParameters(
   body: ExportRequestDto,
 ): Prisma.InputJsonObject {
-  const { format, projectId, ...filters } = body;
+  const { format, projectId, columns, ...filters } = body;
   if (!format) throw new BadRequestException('Format required');
   validateFilters(filters);
   const entries = Object.entries(filters).filter(
@@ -16,7 +16,10 @@ export function exportParameters(
   );
   if (projectId && entries.length)
     throw new BadRequestException('Full project report cannot have filters');
-  return projectId ? { projectId } : Object.fromEntries(entries);
+  return {
+    ...(projectId ? { projectId } : Object.fromEntries(entries)),
+    ...(columns ? { columns } : {}),
+  };
 }
 @Injectable()
 export class ReportExportService {

@@ -52,26 +52,7 @@ export class ImportService {
       throw new NotFoundException('Import not found');
     if (owned.job.expiresAt <= new Date())
       throw new GoneException('Import expired');
-    const [rows, total] = await Promise.all([
-      this.repository.database.prisma.importRow.findMany({
-        where: { jobId: id },
-        orderBy: { position: 'asc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        select: {
-          id: true,
-          sheet: true,
-          rowNumber: true,
-          key: true,
-          data: true,
-          action: true,
-          result: true,
-          errors: true,
-          processedAt: true,
-        },
-      }),
-      this.repository.database.prisma.importRow.count({ where: { jobId: id } }),
-    ]);
+    const { rows, total } = await this.repository.page(id, page, pageSize);
     return {
       ...(await this.jobs.get(user, id)),
       phase: owned.job.phase,
@@ -93,23 +74,7 @@ export class ImportService {
       ['QUEUED', 'RUNNING', 'SUCCEEDED'].includes(owned.job.status)
     )
       return { id, status: owned.job.status };
-    const result = await this.repository.database.prisma.importJob.updateMany({
-      where: {
-        id,
-        ownerId: user.id,
-        status: 'PREVIEW',
-        expiresAt: { gt: new Date() },
-      },
-      data: {
-        phase: 'APPLY',
-        status: 'QUEUED',
-        attempts: 0,
-        executionId: null,
-        leaseUntil: null,
-        progress: 0,
-        errorCode: null,
-      },
-    });
+    const result = await this.repository.beginApply(id, user.id);
     if (!result.count) throw new ConflictException('Import preview not ready');
     void this.queue.notify('import', id, 'APPLY');
     return { id, status: 'QUEUED' };

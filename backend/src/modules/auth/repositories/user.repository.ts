@@ -1,8 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { VisibilityPolicy } from '../auth.types.js';
 import { DatabaseService } from '../../../database/database.service.js';
 
 @Injectable()
 export class UserRepository {
+  async visibility(id: string): Promise<VisibilityPolicy> {
+    // One PostgreSQL statement sees the mode and both grant lists in the same MVCC snapshot.
+    const [policy] = await this.database.prisma.$queryRaw<VisibilityPolicy[]>`
+      SELECT visibility_mode::text AS mode,
+        ARRAY(SELECT university_id FROM kam_visible_universities WHERE user_id = users.id) AS "universityIds",
+        ARRAY(SELECT project_id FROM kam_visible_projects WHERE user_id = users.id) AS "projectIds"
+      FROM users WHERE id = ${id}::uuid`;
+    if (!policy) throw new Error('Visibility user not found');
+    return policy;
+  }
   async name(id: string) {
     const user = await this.database.prisma.user.findUniqueOrThrow({
       where: { id },

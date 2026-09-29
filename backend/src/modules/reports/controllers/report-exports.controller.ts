@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Inject, Post, Req } from '@nestjs/common';
+import { ValidatedBody } from '../../../common/validated-input.js';
+import { Controller, HttpCode, Inject, Post, Req } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
@@ -34,7 +35,10 @@ export class ReportExportsController {
       },
     },
   })
-  create(@Req() request: AuthRequest, @Body() body: ExportRequestDto) {
+  create(
+    @Req() request: AuthRequest,
+    @ValidatedBody(ExportRequestDto) body: ExportRequestDto,
+  ) {
     return this.reports.create(currentUser(request), body);
   }
 }

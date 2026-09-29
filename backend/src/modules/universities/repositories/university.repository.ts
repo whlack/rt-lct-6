@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service.js';
 import type { AuthUser } from '../../auth/index.js';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { universityScope } from '../university-scope.js';
 
 @Injectable()
@@ -17,6 +18,13 @@ export class UniversityRepository {
     });
   }
 
+  async isVisible(id: string, scope: Prisma.UniversityWhereInput) {
+    return (
+      (await this.database.prisma.university.count({
+        where: { AND: [{ id }, scope] },
+      })) > 0
+    );
+  }
   find(id: string) {
     return this.database.prisma.university.findUnique({
       where: { id },
@@ -54,7 +62,7 @@ export class UniversityRepository {
 
   createContact(
     universityId: string,
-    data: { name: string; email?: string; phone?: string },
+    data: { name: string; email?: string | null; phone?: string | null },
   ) {
     return this.database.prisma.universityContact.create({
       data: { universityId, ...data },
@@ -63,7 +71,7 @@ export class UniversityRepository {
 
   updateContact(
     id: string,
-    data: { name: string; email?: string; phone?: string },
+    data: { name: string; email?: string | null; phone?: string | null },
   ) {
     return this.database.prisma.universityContact.update({
       where: { id },

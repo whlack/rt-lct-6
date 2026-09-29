@@ -21,6 +21,7 @@ export class BackgroundIdentityService {
       subject,
       level,
     };
+    user.visibility = await this.auth.visibilityFor(user.id);
     await this.permissions.require(user, permission);
     return user;
   }

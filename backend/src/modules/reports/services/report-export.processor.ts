@@ -1,3 +1,4 @@
+import { reportColumns, type ReportColumn } from '../dto/report-columns.js';
 import {
   BadRequestException,
   Inject,
@@ -37,8 +38,11 @@ function date(value: Date | null): string {
   return value ? value.toISOString() : '';
 }
 type Summary = ReturnType<typeof summaryRow>;
-function summarySection(rows: Summary[]): TableSection {
-  return {
+export function summarySection(
+  rows: Summary[],
+  columns?: ReportColumn[],
+): TableSection {
+  const section: TableSection = {
     title: 'Проекты',
     columns: [
       'ID',
@@ -76,6 +80,13 @@ function summarySection(rows: Summary[]): TableSection {
       p.licenseExpiresYear,
       p.transferStatus,
     ]),
+  };
+  if (!columns) return section;
+  const positions = columns.map((key) => reportColumns.indexOf(key));
+  return {
+    ...section,
+    columns: positions.map((index) => section.columns[index]),
+    rows: section.rows.map((row) => positions.map((index) => row[index])),
   };
 }
 @Injectable()
@@ -118,7 +129,7 @@ export class ReportExportProcessor {
           throw new BadRequestException('Project required');
         const project = await this.reports.detail(tx, user, request.projectId);
         if (!project) throw new NotFoundException('Project unavailable');
-        document.sections.push(summarySection([project]));
+        document.sections.push(summarySection([project], request.columns));
         document.sections.push({
           title: 'Этапы',
           columns: ['Порядок', 'Этап', 'Ожидаемая сторона', 'Контакт'],
@@ -205,23 +216,29 @@ export class ReportExportProcessor {
       if (count > positiveInteger('REPORT_MAX_PROJECTS', 50000))
         throw new BadRequestException('Export too large; narrow filters');
       const projects = await this.reports.all(tx, user, request);
-      document.sections.push(summarySection(projects.map(summaryRow)));
+      document.sections.push(
+        summarySection(projects.map(summaryRow), request.columns),
+      );
       return { document, projectIds: projects.map((p) => p.id) };
     });
     const bytes =
-      request.format === 'pdf'
-        ? await this.renderer.table(result.document)
-        : spreadsheet(result.document, request.format);
+      request.format === 'json'
+        ? Buffer.from(JSON.stringify(result.document), 'utf8')
+        : request.format === 'pdf'
+          ? await this.renderer.table(result.document)
+          : spreadsheet(result.document, request.format);
     return {
       bytes,
       projectIds: result.projectIds,
       fileName: 'crm-report.' + request.format,
       mimeType:
-        request.format === 'pdf'
-          ? 'application/pdf'
-          : request.format === 'xls'
-            ? 'application/vnd.ms-excel'
-            : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        request.format === 'json'
+          ? 'application/json; charset=utf-8'
+          : request.format === 'pdf'
+            ? 'application/pdf'
+            : request.format === 'xls'
+              ? 'application/vnd.ms-excel'
+              : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     };
   }
 }

@@ -16,7 +16,8 @@ export class PermissionService {
 
   async can(user: AuthUser, key: string): Promise<boolean> {
     // This bootstrap permission cannot be lowered through the database it protects.
-    if (key === 'permissions.manage') return user.level === 30;
+    if (['permissions.manage', 'visibility.manage'].includes(key))
+      return user.level === 30;
     const permission = await this.repository.find(key);
     return permission !== null && user.level >= permission.minimumLevel;
   }
@@ -34,7 +35,7 @@ export class PermissionService {
     const permissions = await this.repository.findAll();
     return permissions
       .filter((permission) =>
-        permission.key === 'permissions.manage'
+        ['permissions.manage', 'visibility.manage'].includes(permission.key)
           ? user.level === 30
           : user.level >= permission.minimumLevel,
       )
@@ -42,7 +43,7 @@ export class PermissionService {
   }
 
   async update(key: string, minimumLevel: 10 | 20 | 30) {
-    if (key === 'permissions.manage') {
+    if (['permissions.manage', 'visibility.manage'].includes(key)) {
       if (minimumLevel !== 30)
         throw new ForbiddenException('Administrator level is required');
     }

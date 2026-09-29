@@ -49,5 +49,10 @@
     "prisma": "7.10.0",
     "tsx": "^4.20.5",
     "typescript-eslint": "^8.41.0"
-  }
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "package.json"
+  ]
 }

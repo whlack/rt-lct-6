@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IntegrationSyncModule } from './modules/integration-sync/index.js';
 import { StatusModule } from './modules/status/status.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CatalogsModule } from './modules/catalogs/catalogs.module.js';
@@ -20,6 +21,7 @@ import { StatisticsModule } from './modules/statistics/index.js';
     ReportsModule,
     CatalogImportModule,
     StatisticsModule,
+    IntegrationSyncModule,
   ],
 })
 export class AppModule {}

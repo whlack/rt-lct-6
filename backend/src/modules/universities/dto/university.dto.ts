@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 
 export class UniversityDto {
-  @ApiProperty()
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
@@ -17,32 +17,32 @@ export class UniversityDto {
 }
 
 export class ContactDto {
-  @ApiProperty()
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   name!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsEmail()
-  email?: string;
+  email?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: String, nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  phone?: string;
+  phone?: string | null;
 }
 
 export class PrimaryContactDto {
-  @ApiProperty()
+  @ApiProperty({ type: String })
   @IsUUID()
   contactId!: string;
 }
 
 export class AssigneeDto {
-  @ApiProperty()
+  @ApiProperty({ type: String })
   @IsUUID()
   subject!: string;
 }

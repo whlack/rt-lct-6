@@ -10,6 +10,7 @@ import {
 import type { AuthUser } from '../../auth/index.js';
 import { AuthService } from '../../auth/index.js';
 import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directory.adapter.js';
+import { universityScope } from '../university-scope.js';
 import { UniversityRepository } from '../repositories/university.repository.js';
 import type { ContactDto } from '../dto/university.dto.js';
 
@@ -42,12 +43,8 @@ export class UniversityService {
   async get(user: AuthUser, id: string) {
     const university = await this.repository.find(id);
     if (!university) throw new NotFoundException('University not found');
-    if (
-      user.level < 20 &&
-      !university.assignments.some((item) => item.userId === user.id)
-    ) {
+    if (!(await this.repository.isVisible(id, universityScope(user))))
       throw new ForbiddenException('University is outside your scope');
-    }
     return university;
   }
 
@@ -77,11 +74,20 @@ export class UniversityService {
     return this.repository.listContacts(universityId);
   }
 
-  private contactData(data: ContactDto) {
+  private contactData(
+    data: ContactDto,
+    existing?: { email: string | null; phone: string | null },
+  ) {
     const name = data.name.trim();
     if (!name) throw new BadRequestException('Contact name is required');
-    const email = data.email?.trim() || undefined;
-    const phone = data.phone?.trim() || undefined;
+    const email =
+      data.email === undefined
+        ? (existing?.email ?? null)
+        : data.email?.trim() || null;
+    const phone =
+      data.phone === undefined
+        ? (existing?.phone ?? null)
+        : data.phone?.trim() || null;
     if (!email && !phone)
       throw new BadRequestException('Email or phone is required');
     return { name, email, phone };
@@ -102,7 +108,10 @@ export class UniversityService {
     const contact = await this.repository.findContact(contactId);
     if (!contact || contact.universityId !== universityId)
       throw new NotFoundException('Contact not found');
-    return this.repository.updateContact(contactId, this.contactData(data));
+    return this.repository.updateContact(
+      contactId,
+      this.contactData(data, contact),
+    );
   }
 
   async setPrimaryContact(

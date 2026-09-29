@@ -49,3 +49,24 @@ test('full project export rejects filters and rendering escapes markup', () => {
   );
   assert.equal(escapeHtml('<script>&"'), '&lt;script&gt;&amp;&quot;');
 });
+
+test('export columns accept only unique known fields and preserve the requested order', async () => {
+  const { plainToInstance } = await import('class-transformer');
+  const { validate } = await import('class-validator');
+  const { ExportRequestDto } = await import('../dto/export-request.dto.js');
+  const valid = plainToInstance(ExportRequestDto, {
+    format: 'json',
+    columns: ['university', 'id'],
+  });
+  assert.equal((await validate(valid)).length, 0);
+  assert.deepEqual(exportParameters(valid).columns, ['university', 'id']);
+  for (const columns of [[], ['id', 'id'], ['resultKey']]) {
+    assert.ok(
+      (
+        await validate(
+          plainToInstance(ExportRequestDto, { format: 'json', columns }),
+        )
+      ).length > 0,
+    );
+  }
+});
