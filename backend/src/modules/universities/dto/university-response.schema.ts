@@ -42,6 +42,10 @@ export const universityAssignments = array(
   object({
     universityId: uuid,
     userId: uuid,
-    user: object({ keycloakSubject: text }),
+    user: object({
+      keycloakSubject: text,
+      displayName: nullable(text),
+      email: nullable(text),
+    }),
   }),
 );

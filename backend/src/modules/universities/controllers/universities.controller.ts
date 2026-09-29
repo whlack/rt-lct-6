@@ -219,13 +219,14 @@ export class UniversitiesController {
   @ApiOperation({
     summary: 'Назначенные сотрудники вуза',
     description:
-      'Право: universities.read. Локальные ID и Keycloak subject; полный профиль не возвращается.',
+      'Право: universities.read. Возвращает локальные ID, Keycloak subject, отображаемое имя и email назначенного сотрудника.',
     operationId: 'universities_listAssignments',
   })
   @ApiErrors({
     ...authenticationErrors,
     400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
     404: 'Запись отсутствует или недоступна в текущей области видимости.',
+    503: 'Сервисный каталог Keycloak временно недоступен.',
   })
   @RequirePermission('universities.read')
   @ApiOkResponse({ schema: universityAssignments })

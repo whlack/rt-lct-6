@@ -5,6 +5,6 @@ export interface PublicConfig {
   keycloak: { url: string; realm: string; clientId: string };
 }
 export const sessionApi = {
-  config: () => api<PublicConfig>('/api/config', {}, false),
+  config: () => api<PublicConfig>('/api/config', { cache: 'no-store' }, false),
   me: (signal?: AbortSignal) => api<User>('/api/me', { signal }),
 };

@@ -2,6 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useSession } from '../../features/session';
 import { CommandPalette } from '../../features/global-search';
+import { Settings } from '../../features/settings';
 import { employeeName } from '../../shared/lib';
 import { LineIcon } from '../../shared/ui';
 const links = [
@@ -20,6 +21,7 @@ export function WorkspaceShell({ queue }: { queue: ReactNode }) {
   const { user, can, logout } = useSession();
   const [menu, setMenu] = useState(false);
   const [search, setSearch] = useState(false);
+  const [settings, setSettings] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [error, setError] = useState('');
   const [theme, setTheme] = useState(() => {
@@ -120,7 +122,11 @@ export function WorkspaceShell({ queue }: { queue: ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-spacer" />
-        <div className="sidebar-profile">
+        <button
+          className="sidebar-profile sidebar-profile-button"
+          onClick={() => setSettings(true)}
+          aria-label="Открыть настройки профиля"
+        >
           <span className="avatar">{employeeName(user).slice(0, 1)}</span>
           <span className="sidebar-profile-copy">
             <strong>{employeeName(user)}</strong>
@@ -132,7 +138,7 @@ export function WorkspaceShell({ queue }: { queue: ReactNode }) {
                   : 'КАМ'}
             </small>
           </span>
-        </div>
+        </button>
         <button
           className="button"
           onClick={() => {
@@ -163,6 +169,21 @@ export function WorkspaceShell({ queue }: { queue: ReactNode }) {
             <kbd>⌘ K</kbd>
           </button>
           <div className="topbar-actions">
+            <a
+              className="button designer-version-link"
+              href="https://rt-crm-design.shtab.digital"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              К ДИЗАЙНЕРСКОЙ ВЕРСИИ
+            </a>
+            <button
+              className="icon-button"
+              aria-label="Настройки"
+              onClick={() => setSettings(true)}
+            >
+              <LineIcon name="settings" />
+            </button>
             <NavLink
               className="icon-button help-button"
               to="/help"
@@ -207,6 +228,7 @@ export function WorkspaceShell({ queue }: { queue: ReactNode }) {
           onClose={() => setSearch(false)}
         />
       )}
+      {settings && <Settings onClose={() => setSettings(false)} />}
     </div>
   );
 }

@@ -102,7 +102,16 @@ export class UniversityRepository {
   listAssignments(universityId: string) {
     return this.database.prisma.universityAssignment.findMany({
       where: { universityId },
-      include: { user: { select: { keycloakSubject: true } } },
+      include: {
+        user: {
+          select: {
+            keycloakSubject: true,
+            displayName: true,
+            displayNameOverride: true,
+            email: true,
+          },
+        },
+      },
     });
   }
 }

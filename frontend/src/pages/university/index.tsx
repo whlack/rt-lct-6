@@ -197,7 +197,9 @@ export function UniversityPage() {
             <>
               {tab === 'documents' && <ProjectFiles project={project.data} />}{' '}
               {tab === 'tasks' && <ProjectWorkflow project={project.data} />}{' '}
-              {tab === 'history' && <ProjectHistory id={selected} />}
+              {tab === 'history' && (
+                <ProjectHistory id={selected} stages={project.data.stages} />
+              )}
             </>
           )}
         </>

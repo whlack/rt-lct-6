@@ -11,7 +11,11 @@ export interface Contact extends Named {
 }
 export interface Assignee {
   userId: string;
-  user: { keycloakSubject: string };
+  user: {
+    keycloakSubject: string;
+    displayName: string | null;
+    email: string | null;
+  };
 }
 export const universityApi = {
   list: (signal?: AbortSignal) =>

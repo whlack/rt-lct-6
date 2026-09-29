@@ -85,6 +85,15 @@ try {
         await page.evaluate(() => document.documentElement.dataset.designStyle),
         'standard',
       );
+      const config = await page.evaluate(async () => {
+        const response = await fetch('/api/config');
+        return {
+          cacheControl: response.headers.get('cache-control'),
+          realm: (await response.json()).keycloak.realm,
+        };
+      });
+      assert.equal(config.realm, 'crm');
+      assert.ok(config.cacheControl?.includes('no-store'));
       assert.equal(
         await page
           .getByText(/Демоверсия|Демонстрационные данные|B2B|B2C/)
@@ -116,6 +125,32 @@ try {
       .getByRole('button', { name: 'Тёмная тема', exact: true })
       .click();
     await visible(page.locator('.app-shell.mode-dark'));
+    await page.getByRole('button', { name: 'Настройки', exact: true }).click();
+    const settings = page.getByRole('dialog', { name: 'Настройки' });
+    await visible(settings);
+    assert.equal(
+      await page
+        .getByRole('button', { name: 'Настройки', exact: true })
+        .evaluate((element) => getComputedStyle(element).cursor),
+      'pointer',
+    );
+    assert.equal(
+      await settings.evaluate((element) => getComputedStyle(element).color),
+      'rgb(245, 246, 250)',
+    );
+    await settings.getByRole('button', { name: /CRM и сайт/ }).click();
+    assert.equal(await settings.getByText('Цветовая тема').count(), 0);
+    await settings.getByRole('button', { name: /Системный/ }).click();
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem('crm-font')),
+      'system',
+    );
+    await settings.getByRole('button', { name: /Rostelecom Basis/ }).click();
+    await settings.getByRole('button', { name: /Аккаунт/ }).click();
+    await visible(settings.getByText('Двухфакторная защита'));
+    await settings.screenshot({ path: '/artifacts/settings-dark.png' });
+    await settings.getByRole('button', { name: 'Закрыть' }).click();
+    await settings.waitFor({ state: 'hidden' });
     await capture(page, {
       path: '/artifacts/projects-dark.png',
       fullPage: true,
@@ -146,6 +181,16 @@ try {
       await text(page.locator('table'), 'Защита информационных систем');
       await page.getByRole('button', { name: 'Контакты', exact: true }).click();
       await text(page.locator('main'), 'contact@example.test');
+      await page.getByRole('button', { name: 'Обзор', exact: true }).click();
+      const assignees = page
+        .getByRole('heading', { name: 'Ответственные КАМ' })
+        .locator('..')
+        .locator('.list-stack');
+      await text(assignees, 'frontend-kam');
+      assert.equal(
+        await assignees.getByText(identities.people.kam.subject).count(),
+        0,
+      );
       await capture(page, {
         path: '/artifacts/university-desktop.png',
         fullPage: true,
@@ -382,8 +427,15 @@ try {
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
     await text(page.locator('.page-header'), 'Закрыт');
     await page.getByRole('button', { name: 'История', exact: true }).click();
-    await text(page.locator('.activity-timeline'), 'Проект закрыт');
-    await text(page.locator('.activity-timeline'), 'Документ прикреплён');
+    await text(page.locator('.project-history-timeline'), 'Проект закрыт');
+    await text(
+      page.locator('.project-history-timeline'),
+      'Документ прикреплён',
+    );
+    await text(
+      page.locator('.project-history-timeline'),
+      'Формирование проекта → Согласование',
+    );
     await capture(page, {
       path: '/artifacts/project-desktop.png',
       fullPage: true,

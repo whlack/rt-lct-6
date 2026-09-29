@@ -128,7 +128,24 @@ export class UniversityService {
 
   async listAssignments(user: AuthUser, universityId: string) {
     await this.get(user, universityId);
-    return this.repository.listAssignments(universityId);
+    const assignments = await this.repository.listAssignments(universityId);
+    return Promise.all(
+      assignments.map(async (assignment) => {
+        const profile = await this.directory.profile(
+          assignment.user.keycloakSubject,
+        );
+        const { displayNameOverride, ...stored } = assignment.user;
+        return {
+          ...assignment,
+          user: {
+            keycloakSubject: stored.keycloakSubject,
+            displayName:
+              displayNameOverride ?? profile?.name ?? stored.displayName,
+            email: profile?.email || stored.email,
+          },
+        };
+      }),
+    );
   }
 
   async assign(user: AuthUser, universityId: string, subject: string) {
@@ -139,7 +156,7 @@ export class UniversityService {
       throw new BadRequestException('Existing KAM required');
     const userId = await this.auth.ensureUser(subject);
     await this.repository.assign(universityId, userId);
-    return this.repository.listAssignments(universityId);
+    return this.listAssignments(user, universityId);
   }
 
   async unassign(user: AuthUser, universityId: string, subject: string) {
@@ -152,6 +169,6 @@ export class UniversityService {
     );
     if (!assignment) throw new NotFoundException('Assignment not found');
     await this.repository.unassign(universityId, assignment.userId);
-    return this.repository.listAssignments(universityId);
+    return this.listAssignments(user, universityId);
   }
 }

@@ -319,7 +319,12 @@ export class ProjectService {
         type: 'STAGE_ADVANCED',
         objectType: 'stage',
         objectId: next.id,
-        details: { from: current.id, to: next.id },
+        details: {
+          from: current.id,
+          to: next.id,
+          fromTitle: current.title,
+          toTitle: next.title,
+        },
       });
       return updated;
     });

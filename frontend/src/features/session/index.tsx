@@ -2,11 +2,12 @@ import Keycloak from 'keycloak-js';
 import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { configureSession, ApiError } from '../../shared/api';
-import { sessionApi } from '../../entities/session';
+import { sessionApi, type PublicConfig } from '../../entities/session';
 import { QueryState, State } from '../../shared/ui';
 import { SessionContext, useSession, type Session } from '../../shared/session';
 export { useSession } from '../../shared/session';
 let initializing: Promise<Keycloak> | undefined;
+let initializedConfig: PublicConfig['keycloak'] | undefined;
 function initialize() {
   // The adapter must initialize once, before the router handles OIDC callback parameters.
   initializing ??= sessionApi
@@ -18,6 +19,7 @@ function initialize() {
         pkceMethod: 'S256',
         checkLoginIframe: false,
       });
+      initializedConfig = config.keycloak;
       return client;
     })
     .catch((error) => {
@@ -142,7 +144,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       authenticated && Boolean(profile.data?.permissions.includes(permission)),
     login: async () => {
       // Only a same-origin path is restored; tokens never enter persistent storage.
-      await client.login({
+      // A server Compose recreation can change the realm while this tab stays open.
+      const currentConfig = (await sessionApi.config()).keycloak;
+      const loginClient =
+        JSON.stringify(currentConfig) === JSON.stringify(initializedConfig)
+          ? client
+          : new Keycloak(currentConfig);
+      if (loginClient !== client) {
+        await loginClient.init({
+          onLoad: 'check-sso',
+          pkceMethod: 'S256',
+          checkLoginIframe: false,
+        });
+      }
+      await loginClient.login({
         redirectUri: location.origin + location.pathname + location.search,
       });
     },

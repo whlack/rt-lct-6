@@ -45,11 +45,9 @@ export function UniversityAssignees({ id }: { id: string }) {
             {assignees.data.map((item) => (
               <div className="list-row" key={item.userId}>
                 <span>
-                  {employeeName(
-                    employees.data?.find(
-                      (person) => person.subject === item.user.keycloakSubject,
-                    ) ?? { subject: item.user.keycloakSubject },
-                  )}
+                  {item.user.displayName ||
+                    item.user.email ||
+                    'Сотрудник без профиля'}
                 </span>
                 <button
                   className="button"

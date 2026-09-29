@@ -7,6 +7,7 @@ import {
 import {
   Controller,
   Get,
+  Header,
   HttpException,
   HttpStatus,
   Inject,
@@ -20,6 +21,7 @@ export class StatusController {
   constructor(@Inject(StatusService) private readonly status: StatusService) {}
 
   @Get('config')
+  @Header('Cache-Control', 'no-store')
   @ApiOperation({
     summary: 'Публичная конфигурация входа',
     description:

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { dashboardApi } from '../../entities/dashboard';
-import { projectApi, offering, eventNames } from '../../entities/project';
+import { projectApi, offering, eventTitle } from '../../entities/project';
 import { useSession } from '../../features/session';
 import { ProjectTable } from '../../widgets/project-table';
 import { date, employeeName } from '../../shared/lib';
@@ -199,9 +199,7 @@ export function DashboardPage() {
                         />
                       </span>
                       <span className="activity-copy">
-                        <strong>
-                          {eventNames[event.type] ?? 'Изменение проекта'}
-                        </strong>
+                        <strong>{eventTitle(event)}</strong>
                         <p>
                           {offering(event.project)} ·{' '}
                           {employeeName(event.actor)}

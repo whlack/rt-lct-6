@@ -57,6 +57,20 @@ button {
   border: 0;
   cursor: pointer;
 }
+a[href],
+select:not(:disabled),
+summary,
+[role='button']:not([aria-disabled='true']),
+input[type='checkbox']:not(:disabled),
+input[type='radio']:not(:disabled),
+input[type='file']:not(:disabled) {
+  cursor: pointer;
+}
+label:has(input[type='checkbox']),
+label:has(input[type='radio']),
+label:has(input[type='file']) {
+  cursor: pointer;
+}
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,

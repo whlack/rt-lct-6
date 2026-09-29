@@ -195,3 +195,21 @@ export const eventNames: Record<string, string> = {
   COMMENT_UPDATED: 'Комментарий изменён',
   COMMENT_DELETED: 'Комментарий удалён',
 };
+
+export function eventTitle(
+  event: Pick<Event, 'type' | 'details'>,
+  stageNames?: ReadonlyMap<string, string>,
+): string {
+  if (event.type === 'STAGE_ADVANCED') {
+    const from =
+      typeof event.details?.fromTitle === 'string'
+        ? event.details.fromTitle
+        : stageNames?.get(String(event.details?.from ?? ''));
+    const to =
+      typeof event.details?.toTitle === 'string'
+        ? event.details.toTitle
+        : stageNames?.get(String(event.details?.to ?? ''));
+    if (from && to) return `Переход: ${from} → ${to}`;
+  }
+  return eventNames[event.type] ?? 'Изменение проекта';
+}

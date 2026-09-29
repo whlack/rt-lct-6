@@ -1,6 +1,35 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directory.adapter.js';
+
+test('assigned employee profile uses Keycloak username when local name is absent', async () => {
+  const original = globalThis.fetch;
+  const previous = process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
+  process.env.KEYCLOAK_SERVICE_CLIENT_SECRET = 'fixture';
+  globalThis.fetch = async (input) => {
+    const pathname = new URL(String(input)).pathname;
+    if (pathname.endsWith('/token'))
+      return Response.json({ access_token: 'fixture' });
+    assert.ok(pathname.endsWith('/users/assigned-subject'));
+    return Response.json({
+      id: 'assigned-subject',
+      username: 'kam',
+      enabled: true,
+    });
+  };
+  try {
+    assert.deepEqual(
+      await new KeycloakDirectoryAdapter().profile('assigned-subject'),
+      { subject: 'assigned-subject', email: '', name: 'kam' },
+    );
+  } finally {
+    globalThis.fetch = original;
+    if (previous === undefined)
+      delete process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
+    else process.env.KEYCLOAK_SERVICE_CLIENT_SECRET = previous;
+  }
+});
+
 test('exact email search follows pagination and keeps ambiguous enabled matches', async () => {
   const original = globalThis.fetch;
   const previousAdmin = process.env.KEYCLOAK_SERVICE_CLIENT_ID,

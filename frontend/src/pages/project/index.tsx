@@ -81,7 +81,7 @@ export function ProjectPage() {
       {tab === 'comments' && (
         <ProjectComments id={id} closed={Boolean(project.closedAt)} />
       )}{' '}
-      {tab === 'history' && <ProjectHistory id={id} />}
+      {tab === 'history' && <ProjectHistory id={id} stages={project.stages} />}
     </div>
   );
 }

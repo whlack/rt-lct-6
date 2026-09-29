@@ -9,6 +9,7 @@ export interface Employee {
 
 interface AdminUser {
   id?: string;
+  username?: string;
   email?: string;
   firstName?: string;
   lastName?: string;
@@ -24,7 +25,7 @@ function isAdminUser(value: unknown): value is AdminUser {
   )
     return false;
   return (
-    ['email', 'firstName', 'lastName'].every(
+    ['username', 'email', 'firstName', 'lastName'].every(
       (key) => !(key in value) || typeof Reflect.get(value, key) === 'string',
     ) &&
     (!('enabled' in value) || typeof value.enabled === 'boolean')
@@ -36,6 +37,32 @@ export class KeycloakDirectoryAdapter {
   private readonly base =
     process.env.KEYCLOAK_INTERNAL_URL ?? 'http://keycloak:8080';
   private readonly realmPath = keycloakRealmPath();
+
+  async profile(subject: string): Promise<Employee | null> {
+    const token = await this.serviceToken();
+    const response = await fetch(
+      `${this.base}/admin/realms/${this.realmPath}/users/${encodeURIComponent(subject)}`,
+      {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (response.status === 404) return null;
+    if (!response.ok)
+      throw new ServiceUnavailableException('Keycloak directory unavailable');
+    const user: unknown = await response.json();
+    if (!isAdminUser(user) || !user.id)
+      throw new ServiceUnavailableException('Invalid directory response');
+    return {
+      subject: user.id,
+      email: user.email ?? '',
+      name:
+        user.username ||
+        [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+        user.email ||
+        '',
+    };
+  }
 
   async findEmail(email: string): Promise<Employee[]> {
     const token = await this.serviceToken();

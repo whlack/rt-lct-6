@@ -132,6 +132,12 @@ test('required documents block transition and simultaneous requests advance once
     events.map((event) => event.type),
     ['STAGE_ADVANCED'],
   );
+  assert.deepEqual(events[0]?.details, {
+    from: 'first',
+    to: 'second',
+    fromTitle: 'First',
+    toTitle: 'Second',
+  });
 });
 
 test('transition checks access and closed state inside the project lock', async () => {

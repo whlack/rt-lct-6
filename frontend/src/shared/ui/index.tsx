@@ -179,10 +179,12 @@ export function Modal({
   title,
   onClose,
   children,
+  className = '',
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -199,7 +201,12 @@ export function Modal({
     };
   }, []);
   return (
-    <dialog ref={ref} className="modal" aria-label={title} onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className={`modal ${className}`}
+      aria-label={title}
+      onCancel={onClose}
+    >
       <header className="flex items-center justify-between gap-4">
         <h2>{title}</h2>
         <button className="button" onClick={onClose} aria-label="Закрыть">
