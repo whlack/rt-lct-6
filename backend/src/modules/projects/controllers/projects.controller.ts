@@ -1,5 +1,6 @@
 import { attachmentDisposition } from '../../../common/attachment-disposition.js';
 import {
+  projectActivity,
   projectCard,
   projectComment,
   projectComments,
@@ -9,7 +10,7 @@ import {
   projectRecord,
 } from '../dto/project-response.schema.js';
 import { UploadLimitInterceptor } from '../../../common/upload-limit.interceptor.js';
-import { PageDto } from '../../../common/page.dto.js';
+import { ProjectQueryDto } from '../dto/project.dto.js';
 import {
   UuidParam,
   ValidatedBody,
@@ -28,6 +29,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import {
+  ApiOperation,
   ApiOkResponse,
   ApiCreatedResponse,
   ApiBearerAuth,
@@ -65,8 +67,19 @@ export class ProjectsController {
   @Get()
   @RequirePermission('projects.read')
   @ApiOkResponse({ schema: projectPage })
-  list(@Req() request: AuthRequest, @ValidatedQuery(PageDto) query: PageDto) {
+  list(
+    @Req() request: AuthRequest,
+    @ValidatedQuery(ProjectQueryDto) query: ProjectQueryDto,
+  ) {
     return this.projects.list(currentUser(request), query);
+  }
+
+  @Get('activity')
+  @RequirePermission('projects.read')
+  @ApiOperation({ summary: 'Последние события видимых проектов' })
+  @ApiOkResponse({ schema: projectActivity })
+  activity(@Req() request: AuthRequest) {
+    return this.projects.activity(currentUser(request));
   }
 
   @Get(':id')

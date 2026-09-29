@@ -6,7 +6,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { PageDto } from '../../../common/page.dto.js';
+import type { ProjectQueryDto } from '../dto/project.dto.js';
 import type { AuthUser } from '../../auth/index.js';
 import { AuthService } from '../../auth/index.js';
 import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directory.adapter.js';
@@ -59,8 +59,12 @@ export class ProjectService {
     @Inject(AuthService) private readonly auth: AuthService,
   ) {}
 
-  list(user: AuthUser, query: PageDto) {
+  list(user: AuthUser, query: ProjectQueryDto) {
     return this.repository.list(user, query);
+  }
+
+  activity(user: AuthUser) {
+    return this.repository.activity(user);
   }
 
   async getVisible(user: AuthUser, id: string): Promise<ProjectView> {

@@ -7,6 +7,7 @@ import {
   nullable,
   object,
   profileName,
+  publicProfile,
   subjectProfile,
   text,
   uuid,
@@ -74,7 +75,13 @@ export const projectCard = object({
   supervisor: nullable(subjectProfile),
   stages: array(stage),
 });
-const currentStage = object({ id: uuid, position: integer, title: text });
+const currentStage = object({
+  id: uuid,
+  position: integer,
+  title: text,
+  expectedActor: { type: 'string', enum: ['KAM', 'UNIVERSITY'] },
+  expectedContact: nullable(named),
+});
 export const projectPage = object({
   rows: array(
     object({
@@ -84,7 +91,10 @@ export const projectPage = object({
       program: nullable(named),
       product: nullable(named),
       responsibleId: uuid,
+      responsible: publicProfile,
       supervisorId: nullable(uuid),
+      supervisor: nullable(publicProfile),
+      stageCount: integer,
       currentStageIndex: integer,
       closedAt: nullable(dateTime),
       createdAt: dateTime,
@@ -122,5 +132,21 @@ export const projectHistory = array(
     details: { type: 'object', additionalProperties: true, nullable: true },
     createdAt: dateTime,
     actor: profileName,
+  }),
+);
+
+export const projectActivity = array(
+  object({
+    id: uuid,
+    type: text,
+    createdAt: dateTime,
+    details: { type: 'object', additionalProperties: true, nullable: true },
+    actor: publicProfile,
+    project: object({
+      id: uuid,
+      university: named,
+      program: nullable(named),
+      product: nullable(named),
+    }),
   }),
 );

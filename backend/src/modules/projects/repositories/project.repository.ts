@@ -9,8 +9,15 @@ import type { Prisma } from '../../../generated/prisma/client.js';
 import { DatabaseService } from '../../../database/database.service.js';
 import { publicProfile, type AuthUser } from '../../auth/index.js';
 import { projectScope } from '../project-scope.js';
-import type { PageDto } from '../../../common/page.dto.js';
+import type { ProjectQueryDto } from '../dto/project.dto.js';
 
+const profileSelect = {
+  id: true,
+  keycloakSubject: true,
+  displayName: true,
+  displayNameOverride: true,
+  email: true,
+} as const;
 const projectInclude = {
   university: { select: { id: true, name: true } },
   direction: { select: { id: true, name: true } },
@@ -128,10 +135,66 @@ export class ProjectRepository {
     @Inject(DatabaseService) private readonly database: DatabaseService,
   ) {}
 
-  list(user: AuthUser, query: PageDto) {
-    const where = projectScope(user);
+  list(user: AuthUser, query: ProjectQueryDto) {
+    const search = query.search?.trim();
+    const where: Prisma.ProjectWhereInput = {
+      AND: [
+        projectScope(user),
+        {
+          universityId: query.universityId,
+          directionId: query.directionId,
+          programId: query.programId,
+          productId: query.productId,
+          ...(query.responsibleSubject
+            ? { responsible: { keycloakSubject: query.responsibleSubject } }
+            : {}),
+          ...(query.status
+            ? { closedAt: query.status === 'ACTIVE' ? null : { not: null } }
+            : {}),
+          ...(search
+            ? {
+                OR: [
+                  {
+                    university: {
+                      name: { contains: search, mode: 'insensitive' },
+                    },
+                  },
+                  {
+                    direction: {
+                      name: { contains: search, mode: 'insensitive' },
+                    },
+                  },
+                  {
+                    program: {
+                      name: { contains: search, mode: 'insensitive' },
+                    },
+                  },
+                  {
+                    product: {
+                      name: { contains: search, mode: 'insensitive' },
+                    },
+                  },
+                  { contractNumber: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
+        },
+      ],
+    };
     return this.database.prisma.$transaction(
       async (tx) => {
+        // Current position is a column comparison, not a relation filter on any KAM stage.
+        if (query.actionRequired) {
+          const ids = await tx.$queryRaw<
+            Array<{ id: string }>
+          >`SELECT p.id FROM projects p
+            JOIN project_stages s ON s.project_id = p.id AND s.position = p.current_stage_index
+            WHERE p.closed_at IS NULL AND s.expected_actor = 'KAM'`;
+          where.AND = [
+            ...(Array.isArray(where.AND) ? where.AND : []),
+            { id: { in: ids.map((item) => item.id) } },
+          ];
+        }
         const total = await tx.project.count({ where });
         const projects = await tx.project.findMany({
           where,
@@ -142,27 +205,69 @@ export class ProjectRepository {
             program: { select: { id: true, name: true } },
             product: { select: { id: true, name: true } },
             responsibleId: true,
+            responsible: { select: profileSelect },
             supervisorId: true,
+            supervisor: { select: profileSelect },
             currentStageIndex: true,
             closedAt: true,
             createdAt: true,
-            stages: { select: { id: true, position: true, title: true } },
+            stages: {
+              select: {
+                id: true,
+                position: true,
+                title: true,
+                expectedActor: true,
+                expectedContact: { select: { id: true, name: true } },
+              },
+            },
           },
           orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
         });
-        const rows = projects.map(({ stages, ...project }) => ({
-          ...project,
-          currentStage:
-            stages.find(
-              (stage) => stage.position === project.currentStageIndex,
-            ) ?? null,
-        }));
+        const rows = projects.map(
+          ({ stages, responsible, supervisor, ...project }) => ({
+            ...project,
+            responsible: publicProfile(responsible),
+            supervisor: supervisor ? publicProfile(supervisor) : null,
+            stageCount: stages.length,
+            currentStage:
+              stages.find(
+                (stage) => stage.position === project.currentStageIndex,
+              ) ?? null,
+          }),
+        );
         return { rows, total, page: query.page, pageSize: query.pageSize };
       },
       { isolationLevel: 'RepeatableRead' },
     );
+  }
+
+  async activity(user: AuthUser) {
+    const events = await this.database.prisma.projectEvent.findMany({
+      where: { project: projectScope(user) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 25,
+      select: {
+        id: true,
+        type: true,
+        createdAt: true,
+        details: true,
+        actor: { select: profileSelect },
+        project: {
+          select: {
+            id: true,
+            university: { select: { id: true, name: true } },
+            program: { select: { id: true, name: true } },
+            product: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    return events.map(({ actor, ...event }) => ({
+      ...event,
+      actor: publicProfile(actor),
+    }));
   }
 
   find(id: string): Promise<ProjectView | null> {

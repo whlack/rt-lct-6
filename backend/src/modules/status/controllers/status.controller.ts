@@ -19,6 +19,30 @@ import { Public } from '../../auth/decorators/public.decorator.js';
 export class StatusController {
   constructor(@Inject(StatusService) private readonly status: StatusService) {}
 
+  @Get('config')
+  @Public()
+  @ApiOperation({ summary: 'Public browser authentication configuration' })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      required: ['keycloak'],
+      properties: {
+        keycloak: {
+          type: 'object',
+          required: ['url', 'realm', 'clientId'],
+          properties: {
+            url: { type: 'string' },
+            realm: { type: 'string' },
+            clientId: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  config() {
+    return this.status.publicConfig();
+  }
+
   @Get('health')
   @Public()
   @ApiOperation({ summary: 'Process liveness' })

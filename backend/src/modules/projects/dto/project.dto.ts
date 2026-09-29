@@ -1,3 +1,4 @@
+import { PageDto } from '../../../common/page.dto.js';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -148,4 +149,36 @@ export class CommentBodyDto {
   @IsNotEmpty()
   @MaxLength(5000)
   body!: string;
+}
+
+export class ProjectQueryDto extends PageDto {
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  universityId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  directionId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  programId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+  @ApiPropertyOptional({ type: String })
+  @IsOptional()
+  @IsUUID()
+  responsibleSubject?: string;
+  @ApiPropertyOptional({ type: String, enum: ['ACTIVE', 'CLOSED'] })
+  @IsOptional()
+  @IsIn(['ACTIVE', 'CLOSED'])
+  status?: 'ACTIVE' | 'CLOSED';
+  @ApiPropertyOptional({ type: String, maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
 }
