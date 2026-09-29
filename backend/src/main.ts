@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { setupOpenApi } from './openapi/setup.js';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -46,14 +46,5 @@ app.useGlobalPipes(
     transform: true,
   }),
 );
-const swagger = new DocumentBuilder()
-  .setTitle('CRM API')
-  .setVersion('0.1.0')
-  .addBearerAuth()
-  .build();
-SwaggerModule.setup(
-  'api/docs',
-  app,
-  SwaggerModule.createDocument(app, swagger),
-);
+setupOpenApi(app);
 await app.listen(Number(process.env.PORT ?? 3000), '0.0.0.0');

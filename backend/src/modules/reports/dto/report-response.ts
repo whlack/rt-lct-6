@@ -1,144 +1,133 @@
-import type { ApiResponseOptions } from '@nestjs/swagger';
-type SchemaObject = Extract<ApiResponseOptions, { schema: unknown }>['schema'];
+import {
+  array,
+  boolean,
+  dateTime,
+  integer,
+  named,
+  nullable,
+  object,
+  publicProfile,
+  text,
+  uuid,
+} from '../../../common/api-schema.js';
 
-const text: SchemaObject = { type: 'string' };
-const date: SchemaObject = {
-  type: 'string',
-  format: 'date-time',
-  nullable: true,
-};
-const named: SchemaObject = {
-  type: 'object',
-  properties: { id: { type: 'string', format: 'uuid' }, name: text },
-};
-const person: SchemaObject = {
-  type: 'object',
-  nullable: true,
+/** Возвращаются текущие значения, а период определяет принадлежность проекта выборке. */
+export const reportFilterSchema = {
+  type: 'object' as const,
   properties: {
-    id: text,
-    keycloakSubject: text,
-    displayName: { ...text, nullable: true },
-    email: { ...text, nullable: true },
+    dateFrom: {
+      ...text,
+      format: 'date',
+      description: 'Первый день включительно.',
+      example: '2026-01-01',
+    },
+    dateTo: {
+      ...text,
+      format: 'date',
+      description: 'Последний день включительно.',
+      example: '2026-03-31',
+    },
+    universityId: uuid,
+    directionId: uuid,
+    programId: uuid,
+    productId: uuid,
+    responsibleSubject: uuid,
+    status: { ...text, enum: ['ACTIVE', 'CLOSED'] },
   },
 };
-export const summarySchema: SchemaObject = {
-  type: 'object',
-  properties: {
-    id: { type: 'string', format: 'uuid' },
-    university: named,
-    direction: named,
-    offering: {
-      ...named,
-      properties: {
-        ...named.properties,
-        type: { type: 'string', enum: ['PROGRAM', 'PRODUCT'] },
-      },
-    },
-    status: { type: 'string', enum: ['ACTIVE', 'CLOSED'] },
-    currentStage: {
-      ...named,
-      properties: { id: text, title: text, position: { type: 'integer' } },
-    },
-    responsible: person,
-    supervisor: person,
-    createdAt: date,
-    closedAt: date,
-    vendor: { ...text, nullable: true },
-    contractNumber: { ...text, nullable: true },
-    licenseSignedAt: date,
-    licenseExpiresYear: { type: 'integer', nullable: true },
-    transferStatus: {
-      type: 'string',
-      enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'],
-    },
+export const summarySchema = object({
+  id: uuid,
+  university: named,
+  direction: named,
+  offering: object({
+    id: uuid,
+    name: text,
+    type: { ...text, enum: ['PROGRAM', 'PRODUCT'] },
+  }),
+  status: { ...text, enum: ['ACTIVE', 'CLOSED'] },
+  currentStage: nullable(object({ id: uuid, title: text, position: integer })),
+  responsible: publicProfile,
+  supervisor: nullable(publicProfile),
+  createdAt: dateTime,
+  closedAt: nullable(dateTime),
+  vendor: nullable(text),
+  contractNumber: nullable(text),
+  licenseSignedAt: nullable(dateTime),
+  licenseExpiresYear: nullable(integer),
+  transferStatus: {
+    ...text,
+    enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'],
   },
-};
-export const listSchema: SchemaObject = {
-  type: 'object',
-  properties: {
-    rows: { type: 'array', items: summarySchema },
-    total: { type: 'integer' },
-    page: { type: 'integer' },
-    pageSize: { type: 'integer' },
-    filters: { type: 'object', description: 'Validated request filters' },
-    generatedAt: date,
-    timezone: text,
+});
+export const listSchema = object({
+  rows: array(summarySchema),
+  total: integer,
+  page: integer,
+  pageSize: integer,
+  filters: {
+    ...reportFilterSchema,
+    properties: {
+      ...reportFilterSchema.properties,
+      page: integer,
+      pageSize: integer,
+    },
+    required: ['page', 'pageSize'],
   },
-};
-export const detailSchema: SchemaObject = {
-  type: 'object',
-  properties: {
-    ...summarySchema.properties,
-    stages: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: text,
-          title: text,
-          position: { type: 'integer' },
-          expectedActor: { type: 'string', enum: ['KAM', 'UNIVERSITY'] },
-          expectedContact: { ...named, nullable: true },
-          documentTypes: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: text,
-                name: text,
-                isRequired: { type: 'boolean' },
-              },
-            },
-          },
-          files: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                id: text,
-                documentTypeId: text,
-                fileName: text,
-                mimeType: text,
-                size: { type: 'integer' },
-                status: { type: 'string', enum: ['ATTACHED', 'COMPLETED'] },
-                createdAt: date,
-                uploadedBy: person,
-              },
-            },
-          },
-        },
-      },
-    },
-    comments: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: text,
-          parentId: { ...text, nullable: true },
-          body: { ...text, nullable: true },
-          deletedAt: date,
-          createdAt: date,
-          updatedAt: date,
-          author: person,
-        },
-      },
-    },
-    events: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: text,
-          type: text,
-          objectType: text,
-          objectId: text,
-          details: { type: 'object', nullable: true },
-          createdAt: date,
-          actor: person,
-        },
-      },
-    },
-    generatedAt: date,
-  },
-};
+  generatedAt: dateTime,
+  timezone: { ...text, example: 'Europe/Moscow' },
+});
+/** Полный отчёт не содержит файловое содержимое и служебные ключи хранилища. */
+export const detailSchema = object({
+  ...summarySchema.properties,
+  stages: array(
+    object({
+      id: uuid,
+      projectId: uuid,
+      expectedContactId: nullable(uuid),
+      title: text,
+      position: integer,
+      expectedActor: { ...text, enum: ['KAM', 'UNIVERSITY'] },
+      expectedContact: nullable(named),
+      documentTypes: array(
+        object({ id: uuid, stageId: uuid, name: text, isRequired: boolean }),
+      ),
+      files: array(
+        object({
+          id: uuid,
+          documentTypeId: uuid,
+          fileName: text,
+          mimeType: text,
+          size: integer,
+          status: { ...text, enum: ['ATTACHED', 'COMPLETED'] },
+          createdAt: dateTime,
+          uploadedBy: publicProfile,
+        }),
+      ),
+    }),
+  ),
+  comments: array(
+    object({
+      id: uuid,
+      parentId: nullable(uuid),
+      body: nullable(text),
+      deletedAt: nullable(dateTime),
+      createdAt: dateTime,
+      updatedAt: dateTime,
+      author: publicProfile,
+    }),
+  ),
+  events: array(
+    object({
+      id: uuid,
+      projectId: uuid,
+      actorId: uuid,
+      type: text,
+      objectType: text,
+      objectId: uuid,
+      details: { type: 'object', additionalProperties: true, nullable: true },
+      createdAt: dateTime,
+      actor: publicProfile,
+    }),
+  ),
+  generatedAt: dateTime,
+});

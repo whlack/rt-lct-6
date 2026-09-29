@@ -110,6 +110,7 @@ services:
       dockerfile: backend/Dockerfile
       target: development
     environment: &backend-env
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: *database-url
       PORT: 3000
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?}

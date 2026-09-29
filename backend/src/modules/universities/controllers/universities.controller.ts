@@ -1,4 +1,12 @@
 import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ApiErrors, authenticationErrors } from '../../../common/api-errors.js';
+import {
   universityCard,
   universityContacts,
   universityContact,
@@ -16,12 +24,6 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiCreatedResponse,
-  ApiBearerAuth,
-  ApiTags,
-} from '@nestjs/swagger';
 import {
   currentUser,
   RequirePermission,
@@ -44,6 +46,13 @@ export class UniversitiesController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Список доступных вузов',
+    description:
+      'Право: universities.read. Возвращает массив кратких проекций без пагинации. Политика видимости КАМ применяется на сервере.',
+    operationId: 'universities_list',
+  })
+  @ApiErrors({ ...authenticationErrors })
   @RequirePermission('universities.read')
   @ApiOkResponse({ schema: universityList })
   list(@Req() request: AuthRequest) {
@@ -51,6 +60,17 @@ export class UniversitiesController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Карточка вуза',
+    description:
+      'Право: universities.read. Сведения вуза и локальные ID назначенных сотрудников.',
+    operationId: 'universities_get',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('universities.read')
   @ApiOkResponse({ schema: universityCard })
   get(@Req() request: AuthRequest, @UuidParam('id') id: string) {
@@ -58,6 +78,17 @@ export class UniversitiesController {
   }
 
   @Post()
+  @ApiOperation({
+    summary: 'Создать вуз',
+    description:
+      'Право: universities.create. Название нормализуется для уникальности; автор автоматически назначается сотрудником вуза.',
+    operationId: 'universities_create',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    409: 'Конфликт текущего состояния; обновите данные или дождитесь завершения задания.',
+  })
   @RequirePermission('universities.create')
   @ApiCreatedResponse({ schema: universityRecord })
   create(
@@ -68,6 +99,18 @@ export class UniversitiesController {
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Изменить название вуза',
+    description:
+      'Право: universities.update. Уникальность без учёта регистра и повторных пробелов проверяет PostgreSQL.',
+    operationId: 'universities_update',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+    409: 'Конфликт текущего состояния; обновите данные или дождитесь завершения задания.',
+  })
   @RequirePermission('universities.update')
   @ApiOkResponse({ schema: universityRecord })
   update(
@@ -79,6 +122,17 @@ export class UniversitiesController {
   }
 
   @Get(':id/contacts')
+  @ApiOperation({
+    summary: 'Контакты вуза',
+    description:
+      'Право: university_contacts.read. Массив контактных лиц доступного вуза.',
+    operationId: 'universities_listContacts',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('university_contacts.read')
   @ApiOkResponse({ schema: universityContacts })
   listContacts(@Req() request: AuthRequest, @UuidParam('id') id: string) {
@@ -86,6 +140,17 @@ export class UniversitiesController {
   }
 
   @Post(':id/contacts')
+  @ApiOperation({
+    summary: 'Добавить контакт вуза',
+    description:
+      'Право: university_contacts.create. Обязательны имя и хотя бы email либо phone. Контакт вуза не является учётной записью Keycloak.',
+    operationId: 'universities_createContact',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('university_contacts.create')
   @ApiCreatedResponse({ schema: universityContact })
   createContact(
@@ -97,6 +162,17 @@ export class UniversitiesController {
   }
 
   @Patch(':id/contacts/:contactId')
+  @ApiOperation({
+    summary: 'Изменить контакт вуза',
+    description:
+      'Право: university_contacts.update. Передаётся имя и хотя бы email либо phone; null очищает необязательное контактное поле.',
+    operationId: 'universities_updateContact',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('university_contacts.update')
   @ApiOkResponse({ schema: universityContact })
   updateContact(
@@ -114,6 +190,17 @@ export class UniversitiesController {
   }
 
   @Patch(':id/primary-contact')
+  @ApiOperation({
+    summary: 'Выбрать основной контакт',
+    description:
+      'Право: university_contacts.update. Контакт должен принадлежать этому вузу.',
+    operationId: 'universities_setPrimaryContact',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('university_contacts.update')
   @ApiOkResponse({ schema: universityRecord })
   setPrimaryContact(
@@ -129,6 +216,17 @@ export class UniversitiesController {
   }
 
   @Get(':id/assignees')
+  @ApiOperation({
+    summary: 'Назначенные сотрудники вуза',
+    description:
+      'Право: universities.read. Локальные ID и Keycloak subject; полный профиль не возвращается.',
+    operationId: 'universities_listAssignments',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('universities.read')
   @ApiOkResponse({ schema: universityAssignments })
   listAssignments(@Req() request: AuthRequest, @UuidParam('id') id: string) {
@@ -136,6 +234,18 @@ export class UniversitiesController {
   }
 
   @Post(':id/assignees')
+  @ApiOperation({
+    summary: 'Назначить КАМ на вуз',
+    description:
+      'Право: universities.assignees.manage. Уровень не ниже 20. subject должен соответствовать существующему КАМ Keycloak. Возвращается обновлённый список назначений.',
+    operationId: 'universities_assign',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+    503: 'Сервисный каталог Keycloak временно недоступен.',
+  })
   @RequirePermission('universities.assignees.manage')
   @ApiCreatedResponse({ schema: universityAssignments })
   assign(
@@ -147,6 +257,17 @@ export class UniversitiesController {
   }
 
   @Delete(':id/assignees/:subject')
+  @ApiOperation({
+    summary: 'Снять назначение КАМ',
+    description:
+      'Право: universities.assignees.manage. Уровень не ниже 20. Возвращается обновлённый список; отсутствующее назначение — 404.',
+    operationId: 'universities_unassign',
+  })
+  @ApiErrors({
+    ...authenticationErrors,
+    400: 'Неверный UUID, параметры или тело запроса; нарушено предметное ограничение.',
+    404: 'Запись отсутствует или недоступна в текущей области видимости.',
+  })
   @RequirePermission('universities.assignees.manage')
   @ApiOkResponse({ schema: universityAssignments })
   unassign(

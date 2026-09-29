@@ -6,10 +6,21 @@ import {
   ValidationPipe,
   type Type,
 } from '@nestjs/common';
-import { ApiBody, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiParam,
+  ApiQuery,
+  type ExamplesObject,
+} from '@nestjs/swagger';
 
-function input(dto: Type<unknown>, kind: 'body' | 'query'): ParameterDecorator {
-  // tsx omits design:paramtypes. Bind both validation and OpenAPI to the actual DTO.
+type BodyDocumentation = { description?: string; examples?: ExamplesObject };
+
+function input(
+  dto: Type<unknown>,
+  kind: 'body' | 'query',
+  documentationOptions: BodyDocumentation = {},
+): ParameterDecorator {
+  // tsx не создаёт design:paramtypes: привязываем валидацию и OpenAPI к явному DTO.
   const pipe = new ValidationPipe({
     expectedType: dto,
     transform: true,
@@ -23,12 +34,18 @@ function input(dto: Type<unknown>, kind: 'body' | 'query'): ParameterDecorator {
     const descriptor = Object.getOwnPropertyDescriptor(target, key);
     if (!descriptor) throw new Error('DTO input method is missing');
     const documentation =
-      kind === 'body' ? ApiBody({ type: dto }) : ApiQuery({ type: dto });
+      kind === 'body'
+        ? ApiBody({ ...documentationOptions, type: dto })
+        : ApiQuery({ type: dto });
     documentation(target, key, descriptor);
   };
 }
 
-export const ValidatedBody = (dto: Type<unknown>) => input(dto, 'body');
+// Примеры передаются в единственный ApiBody: несколько декораторов дают конкурирующие body-параметры.
+export const ValidatedBody = (
+  dto: Type<unknown>,
+  documentation?: BodyDocumentation,
+) => input(dto, 'body', documentation);
 export const ValidatedQuery = (dto: Type<unknown>) => input(dto, 'query');
 
 export function UuidParam(name: string): ParameterDecorator {
@@ -37,6 +54,13 @@ export function UuidParam(name: string): ParameterDecorator {
     if (key === undefined) throw new Error('UUID parameter requires a method');
     const descriptor = Object.getOwnPropertyDescriptor(target, key);
     if (!descriptor) throw new Error('UUID parameter method is missing');
-    ApiParam({ name, type: String, format: 'uuid' })(target, key, descriptor);
+    ApiParam({
+      name,
+      description:
+        name === 'subject' ? 'UUID сотрудника Keycloak.' : 'UUID объекта CRM.',
+      type: String,
+      example: '11111111-1111-4111-8111-111111111111',
+      format: 'uuid',
+    })(target, key, descriptor);
   };
 }

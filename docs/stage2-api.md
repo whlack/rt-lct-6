@@ -68,3 +68,5 @@ POST /api/catalog-imports/:id/apply — отдельное подтвержде�
 В POST отчёта optional `columns` задаёт порядок колонок сводки: id, university, direction, offeringType, offering, status, stage, responsible, supervisor, createdAt, closedAt, vendor, contractNumber, licenseSignedAt, licenseExpiresYear, transferStatus. Без поля выбираются все; пустой, повторяющийся или неизвестный список отклоняется. Для отчёта проекта настройка относится только к секции сводки.
 
 Пример: `{ "format": "json", "columns": ["university", "id"] }`. JSON-файл имеет title/generatedAt/timezone и sections; каждая секция содержит title, columns и rows с упорядоченными значениями. Полный JSON проекта содержит также этапы, документы, комментарии и историю; ключи S3 и удалённые тексты не включаются. Создание и получение проходят тот же `/api/jobs` и повторные проверки доступа.
+
+Полная спецификация всех этапов доступна через Swagger вне production. См. [руководство OpenAPI](./openapi.md) для входа, ошибок, загрузки файлов и последовательностей фоновых операций.
