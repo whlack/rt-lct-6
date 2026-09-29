@@ -110,6 +110,7 @@ services:
       dockerfile: backend/Dockerfile
       target: development
     environment: &backend-env
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: *database-url
       PORT: 3000
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?}
@@ -209,8 +210,7 @@ services:
       dockerfile: frontend/Dockerfile
       target: development
     environment:
-      VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:?}
-      VITE_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:?}
+      API_UPSTREAM: ${API_UPSTREAM:-http://backend:3000}
     volumes:
       - ./frontend/src:/workspace/frontend/src
     ports:

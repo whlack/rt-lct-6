@@ -1,0 +1,222 @@
+/* The initial CRM presentation uses opaque surfaces and Rostelecom brand accents. */
+html[data-design-style='standard'] .design-glass {
+  --accent: #7700ff;
+  --accent-strong: #6000ce;
+  --accent-soft: #f4eaff;
+  --accent-soft-strong: #ead9ff;
+  --orange: #ff4f12;
+  --ink: #101828;
+  --muted: #596579;
+  --quiet: #798497;
+  --line: #e3e8ec;
+  --canvas: #f5f7f9;
+  --surface: #fff;
+  --surface-strong: #fff;
+  --surface-soft: #fff;
+  --panel: #fff;
+  --panel-hover: #faf7ff;
+  --shadow: none;
+  --glass-blur: none;
+  --material-shell: #fff;
+  --material-panel: #fff;
+  --material-data: #fff;
+  --material-floating: #fff;
+  --material-fallback: #fff;
+  --material-edge: #e3e8ec;
+  --material-tint: #f4eaff;
+  --material-blur-shell: none;
+  --material-blur-floating: none;
+  --material-shadow-panel: none;
+  --material-shadow-floating: 0 10px 25px #10182814;
+  --radius-panel: 10px;
+  --radius-floating: 10px;
+}
+
+html[data-design-style='standard'] .design-glass.mode-dark {
+  --accent: #b383ff;
+  --accent-strong: #d0b2ff;
+  --accent-soft: #302541;
+  --accent-soft-strong: #3c2b57;
+  --orange: #ff8b62;
+  --ink: #f5f6fa;
+  --muted: #c2c6d3;
+  --quiet: #a9aebd;
+  --line: #404657;
+  --canvas: #171a24;
+  --surface: #242836;
+  --surface-strong: #242836;
+  --surface-soft: #242836;
+  --panel: #242836;
+  --panel-hover: #303548;
+  --material-shell: #242836;
+  --material-panel: #242836;
+  --material-data: #242836;
+  --material-floating: #2e3444;
+  --material-fallback: #242836;
+  --material-edge: #404657;
+  --material-tint: #302541;
+  --material-shadow-floating: 0 10px 25px #0004;
+}
+
+html[data-design-style='standard']
+  .design-glass.mode-dark
+  .project-status.attention,
+html[data-design-style='standard'] .design-glass.mode-dark .due-badge {
+  color: #ffb28d;
+  background: #513329;
+}
+
+html[data-design-style='standard']
+  .design-glass.mode-dark
+  .project-status.active {
+  color: #c3a6ff;
+  background: #3c2b57;
+}
+
+html[data-design-style='standard'] .design-glass > .atmosphere {
+  display: none;
+}
+
+html[data-design-style='standard'] .design-glass .partner-ribbon {
+  display: none;
+}
+
+html[data-design-style='standard'] .design-glass *,
+html[data-design-style='standard'] .design-glass *::before,
+html[data-design-style='standard'] .design-glass *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-design-style='standard'] .design-glass.app-shell {
+  padding: 14px;
+  gap: 14px;
+  background: var(--canvas);
+}
+
+html[data-design-style='standard'] .design-glass .sidebar,
+html[data-design-style='standard'] .design-glass .topbar,
+html[data-design-style='standard'] .design-glass .main-content,
+html[data-design-style='standard'] .design-glass .panel,
+html[data-design-style='standard'] .design-glass .detail-block,
+html[data-design-style='standard'] .design-glass .project-card,
+html[data-design-style='standard'] .design-glass .project-detail,
+html[data-design-style='standard'] .design-glass .dashboard-card,
+html[data-design-style='standard'] .design-glass .collaboration-map,
+html[data-design-style='standard'] .design-glass .glass-metrics article {
+  border-color: var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+html[data-design-style='standard'] .design-glass .sidebar,
+html[data-design-style='standard'] .design-glass .topbar {
+  background: var(--material-shell);
+}
+
+html[data-design-style='standard'] .design-glass .main-content {
+  margin-top: 14px;
+}
+
+html[data-design-style='standard'] .design-glass .global-search,
+html[data-design-style='standard'] .design-glass .icon-button,
+html[data-design-style='standard'] .design-glass .button-secondary {
+  border-color: var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+html[data-design-style='standard']
+  .design-glass
+  .workspace-navigation
+  .nav-item.is-active,
+html[data-design-style='standard'] .design-glass .active-glass-pill {
+  border-color: var(--line);
+  background: var(--accent-soft-strong);
+  box-shadow: none;
+}
+
+html[data-design-style='standard'] .design-glass .button-primary {
+  color: #fff;
+  border-color: #7700ff;
+  background: #7700ff;
+}
+
+html[data-design-style='standard'] .design-glass.mode-dark .button-primary {
+  color: #fff;
+}
+
+html[data-design-style='standard'] .design-glass .button-primary:hover {
+  background: #854aff;
+}
+
+.design-glass.mode-dark .glass-brand img {
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+
+.design-glass.mode-dark .glass-brand small {
+  color: var(--muted);
+}
+
+html[data-design-style='standard'] .design-glass.login-screen {
+  background: var(--canvas);
+}
+
+html[data-design-style='standard'] .design-glass .login-panel {
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.appearance-preference {
+  display: grid;
+  gap: 8px;
+  margin: 22px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.appearance-preference legend {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.appearance-preference label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.appearance-preference label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.appearance-preference input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 1180px) {
+  html[data-design-style='standard'] .design-glass.app-shell {
+    padding: 14px;
+    gap: 14px;
+  }
+}
+
+@media (max-width: 620px) {
+  html[data-design-style='standard'] .design-glass.app-shell {
+    padding: 10px;
+    gap: 10px;
+  }
+}

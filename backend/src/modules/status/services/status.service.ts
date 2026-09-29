@@ -8,6 +8,17 @@ export class StatusService {
     private readonly database: Pick<DatabaseService, 'isReady'>,
   ) {}
 
+  publicConfig() {
+    // An explicit allowlist prevents server credentials from entering browser configuration.
+    return {
+      keycloak: {
+        url: process.env.KEYCLOAK_PUBLIC_URL ?? 'http://localhost:8080',
+        realm: 'crm',
+        clientId: process.env.KEYCLOAK_CLIENT_ID ?? 'crm-web',
+      },
+    };
+  }
+
   health(): { status: 'ok' } {
     return { status: 'ok' };
   }
