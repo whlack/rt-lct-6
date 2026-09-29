@@ -1,0 +1,99 @@
+/* Native select remains the accessible fallback where customizable selects are unsupported. */
+.design-glass {
+  color-scheme: light;
+  --scroll-track: #edf0f5;
+  --scroll-thumb: #a9b4c5;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  scrollbar-width: thin;
+}
+
+.design-glass.mode-dark {
+  color-scheme: dark;
+  --scroll-track: #1d2230;
+  --scroll-thumb: #677187;
+}
+
+.design-glass * {
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  scrollbar-width: thin;
+}
+
+.design-glass *::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.design-glass *::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: 99px;
+}
+
+.design-glass *::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 2px solid var(--scroll-track);
+  border-radius: 99px;
+}
+
+.design-glass *::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.design-glass select,
+.design-glass dialog select {
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+@supports (appearance: base-select) {
+  .design-glass select,
+  .design-glass select::picker(select) {
+    appearance: base-select;
+  }
+
+  .design-glass select {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 10px;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    background: var(--material-data);
+  }
+
+  .design-glass select::picker-icon {
+    margin-left: auto;
+    color: var(--muted);
+    transition: transform 140ms ease;
+  }
+
+  .design-glass select:open::picker-icon {
+    transform: rotate(180deg);
+  }
+
+  .design-glass select::picker(select) {
+    margin-block: 5px;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--material-floating);
+    box-shadow: var(--material-shadow-floating);
+  }
+
+  .design-glass select option {
+    padding: 9px 11px;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 13px;
+  }
+
+  .design-glass select option:hover,
+  .design-glass select option:focus-visible {
+    background: var(--material-tint);
+  }
+
+  .design-glass select option:checked {
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+  }
+}

@@ -4,7 +4,8 @@ set -eu
 select_environment "$@"
 
 if [ "$1" = '--local' ]; then
-  compose up --build -d postgres redis keycloak backend frontend
+  compose up --build -d postgres redis keycloak minio-setup backend worker frontend
+  "$ROOT_DIR/scripts/seed-local-users.sh" --local
 else
-  compose up --no-build -d postgres redis keycloak backend frontend
+  compose up --no-build -d postgres redis keycloak backend worker frontend
 fi

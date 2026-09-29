@@ -1,0 +1,225 @@
+/* The process map is a working surface: keep its route, tabs and editor in view. */
+html .design-glass .main-content.workflow-main {
+  padding: 18px 22px;
+}
+
+.workflow-main > .page-context,
+.workflow-main .page-heading-row .eyebrow,
+.workflow-main .page-heading-row .page-lead {
+  display: none;
+}
+
+html .design-glass .workflow-main .page-heading-row {
+  margin: 0 0 10px;
+}
+
+html .design-glass .workflow-main .page-heading-row h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+html .design-glass .workflow-main .inline-alert.provenance {
+  margin: 0 0 12px;
+  padding: 6px 0;
+  border: 0;
+  color: var(--muted);
+}
+
+.workflow-main .workflow-panel {
+  padding: 16px;
+}
+
+.workflow-panel-header,
+.workflow-panel-title {
+  display: flex;
+  align-items: center;
+}
+
+.workflow-panel-header {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.workflow-panel-title {
+  gap: 12px;
+  min-width: 0;
+}
+
+.workflow-panel-title h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.workflow-panel-title > span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.workflow-main .workflow-canvas {
+  margin-top: 10px;
+}
+
+.workflow-main .workflow-diagram {
+  grid-auto-rows: minmax(118px, auto);
+  gap: 26px 18px;
+  padding: 18px;
+}
+
+.workflow-main .workflow-node {
+  min-height: 118px;
+  border-radius: 11px;
+}
+
+.workflow-main .workflow-node-top {
+  min-height: 34px;
+  padding: 4px 9px;
+}
+
+.workflow-main .workflow-node-number {
+  width: 24px;
+  height: 24px;
+}
+
+.workflow-main .workflow-node-body {
+  gap: 3px;
+  padding: 9px;
+}
+
+.workflow-main .workflow-node strong {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.workflow-main .workflow-node small {
+  font-size: 11px;
+}
+
+.workflow-count-compact {
+  display: none;
+}
+
+.workflow-main .workflow-canvas-footer {
+  margin-top: 8px;
+}
+
+.workflow-main .workflow-zoom-controls button {
+  min-height: 27px;
+}
+
+.workflow-main .add-stage-form {
+  margin-top: 8px;
+}
+
+.workflow-main .add-stage-form input {
+  min-height: 36px;
+}
+
+.workflow-main .add-stage-form .button {
+  min-height: 36px;
+}
+
+@media (max-width: 1000px) {
+  html .design-glass .main-content.workflow-main {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 850px) {
+  .workflow-panel-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .workflow-panel-header .workflow-tabs {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  html .design-glass .main-content.workflow-main {
+    padding: 14px 11px;
+  }
+
+  .workflow-main .workflow-panel {
+    padding: 10px;
+  }
+
+  .workflow-main .heading-actions:empty {
+    display: none;
+  }
+
+  .workflow-panel-title h2 {
+    font-size: 16px;
+  }
+
+  .workflow-panel-header .workflow-tabs {
+    align-self: stretch;
+  }
+
+  .workflow-main .workflow-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    zoom: 1 !important;
+  }
+
+  .workflow-main .workflow-connections {
+    display: none;
+  }
+
+  .workflow-main .workflow-node {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    min-height: 56px;
+    box-shadow: none;
+  }
+
+  .workflow-main .workflow-node-top {
+    justify-content: center;
+    width: 42px;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .workflow-main .workflow-node-direction {
+    display: none;
+  }
+
+  .workflow-main .workflow-node-body {
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .workflow-main .workflow-node-project-count {
+    flex: 0 0 auto;
+    padding: 3px 5px;
+    border-radius: 5px;
+    background: var(--surface-soft);
+    white-space: nowrap;
+  }
+
+  .workflow-count-full {
+    display: none;
+  }
+
+  .workflow-count-compact {
+    display: inline;
+  }
+
+  .workflow-main .workflow-canvas-footer {
+    gap: 5px;
+  }
+
+  .workflow-main .workflow-zoom-controls {
+    display: none;
+  }
+}

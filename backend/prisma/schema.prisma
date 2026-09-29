@@ -8,9 +8,26 @@ datasource db {
 }
 
 model User {
-  id                  String   @id @default(uuid()) @db.Uuid
-  keycloakSubject     String   @unique @map("keycloak_subject")
-  createdAt           DateTime @default(now()) @map("created_at")
+  id                  String                 @id @default(uuid()) @db.Uuid
+  keycloakSubject     String                 @unique @map("keycloak_subject")
+  displayName         String?                @map("display_name")
+  displayNameOverride String?                @map("display_name_override")
+  email               String?
+  visibilityMode      VisibilityMode         @default(ASSIGNED) @map("visibility_mode")
+  visibleUniversities KamVisibleUniversity[]
+  visibleProjects     KamVisibleProject[]
+  createdAt           DateTime               @default(now()) @map("created_at")
+  universities        University[]           @relation("UniversityCreator")
+  assignments         UniversityAssignment[]
+  projectsCreated     Project[]              @relation("ProjectCreator")
+  projectsOwned       Project[]              @relation("ProjectResponsible")
+  projectsLed         Project[]              @relation("ProjectSupervisor")
+  comments            ProjectComment[]
+  files               ProjectFile[]
+  events              ProjectEvent[]
+  exportJobs          ExportJob[]
+  syncRuns            IntegrationSyncRun[]
+  importJobs          ImportJob[]
 
   @@map("users")
 }
@@ -21,4 +38,379 @@ model Permission {
   minimumLevel Int    @map("minimum_level")
 
   @@map("permissions")
+}
+
+model Direction {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
+
+  @@map("directions")
+}
+
+model Program {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
+
+  @@map("programs")
+}
+
+model Product {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @unique
+  normalizedName String    @unique @default(dbgenerated()) @map("normalized_name")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  projects       Project[]
+
+  @@map("products")
+}
+
+model University {
+  id               String                 @id @default(uuid()) @db.Uuid
+  name             String                 @unique
+  normalizedName   String                 @unique @default(dbgenerated()) @map("normalized_name")
+  primaryContactId String?                @map("primary_contact_id") @db.Uuid
+  primaryContact   UniversityContact?     @relation("PrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
+  contacts         UniversityContact[]    @relation("UniversityContacts")
+  assignments      UniversityAssignment[]
+  projects         Project[]
+  visibilityGrants KamVisibleUniversity[]
+  createdById      String                 @map("created_by_id") @db.Uuid
+  createdBy        User                   @relation("UniversityCreator", fields: [createdById], references: [id])
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  @@map("universities")
+}
+
+model UniversityContact {
+  id             String         @id @default(uuid()) @db.Uuid
+  universityId   String         @map("university_id") @db.Uuid
+  university     University     @relation("UniversityContacts", fields: [universityId], references: [id], onDelete: Cascade)
+  primaryFor     University[]   @relation("PrimaryContact")
+  expectedStages ProjectStage[]
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([universityId])
+  @@map("university_contacts")
+}
+
+model UniversityAssignment {
+  universityId String     @map("university_id") @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([universityId, userId])
+  @@map("university_assignments")
+}
+
+enum TransferStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ExpectedActor {
+  KAM
+  UNIVERSITY
+}
+
+enum FileStatus {
+  ATTACHED
+  COMPLETED
+}
+
+model Project {
+  id                 String              @id @default(uuid()) @db.Uuid
+  universityId       String              @map("university_id") @db.Uuid
+  university         University          @relation(fields: [universityId], references: [id])
+  directionId        String              @map("direction_id") @db.Uuid
+  direction          Direction           @relation(fields: [directionId], references: [id])
+  programId          String?             @map("program_id") @db.Uuid
+  program            Program?            @relation(fields: [programId], references: [id], onDelete: Restrict)
+  productId          String?             @map("product_id") @db.Uuid
+  product            Product?            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  responsibleId      String              @map("responsible_id") @db.Uuid
+  responsible        User                @relation("ProjectResponsible", fields: [responsibleId], references: [id])
+  supervisorId       String?             @map("supervisor_id") @db.Uuid
+  supervisor         User?               @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  createdById        String              @map("created_by_id") @db.Uuid
+  createdBy          User                @relation("ProjectCreator", fields: [createdById], references: [id])
+  vendor             String?
+  contractNumber     String?             @map("contract_number")
+  licenseSignedAt    DateTime?           @map("license_signed_at") @db.Date
+  licenseExpiresYear Int?                @map("license_expires_year")
+  transferStatus     TransferStatus      @default(NOT_STARTED) @map("transfer_status")
+  currentStageIndex  Int                 @default(0) @map("current_stage_index")
+  workflowLocked     Boolean             @default(false) @map("workflow_locked")
+  closedAt           DateTime?           @map("closed_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  stages             ProjectStage[]
+  comments           ProjectComment[]
+  events             ProjectEvent[]
+  exportJobs         ExportJobProject[]
+  visibilityGrants   KamVisibleProject[]
+
+  @@index([universityId])
+  @@index([responsibleId])
+  @@map("projects")
+}
+
+model ProjectStage {
+  id                String              @id @default(uuid()) @db.Uuid
+  projectId         String              @map("project_id") @db.Uuid
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  position          Int
+  title             String
+  expectedActor     ExpectedActor       @default(KAM) @map("expected_actor")
+  expectedContactId String?             @map("expected_contact_id") @db.Uuid
+  expectedContact   UniversityContact?  @relation(fields: [expectedContactId], references: [id])
+  documentTypes     StageDocumentType[]
+  files             ProjectFile[]
+
+  @@unique([projectId, position])
+  @@map("project_stages")
+}
+
+model StageDocumentType {
+  id         String        @id @default(uuid()) @db.Uuid
+  stageId    String        @map("stage_id") @db.Uuid
+  stage      ProjectStage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  name       String
+  isRequired Boolean       @default(false) @map("is_required")
+  files      ProjectFile[]
+
+  @@unique([stageId, name])
+  @@map("stage_document_types")
+}
+
+model ProjectFile {
+  id             String            @id @default(uuid()) @db.Uuid
+  stageId        String            @map("stage_id") @db.Uuid
+  stage          ProjectStage      @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  documentTypeId String            @map("document_type_id") @db.Uuid
+  documentType   StageDocumentType @relation(fields: [documentTypeId], references: [id])
+  storageKey     String            @unique @map("storage_key")
+  fileName       String            @map("file_name")
+  mimeType       String            @map("mime_type")
+  size           Int
+  status         FileStatus        @default(ATTACHED)
+  uploadedById   String            @map("uploaded_by_id") @db.Uuid
+  uploadedBy     User              @relation(fields: [uploadedById], references: [id])
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@index([stageId])
+  @@map("project_files")
+}
+
+model ProjectComment {
+  id        String           @id @default(uuid()) @db.Uuid
+  projectId String           @map("project_id") @db.Uuid
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId  String?          @map("parent_id") @db.Uuid
+  parent    ProjectComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   ProjectComment[] @relation("CommentReplies")
+  authorId  String           @map("author_id") @db.Uuid
+  author    User             @relation(fields: [authorId], references: [id])
+  body      String
+  deletedAt DateTime?        @map("deleted_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@index([projectId])
+  @@map("project_comments")
+}
+
+model ProjectEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  projectId  String   @map("project_id") @db.Uuid
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId    String   @map("actor_id") @db.Uuid
+  actor      User     @relation(fields: [actorId], references: [id])
+  type       String
+  objectType String   @map("object_type")
+  objectId   String   @map("object_id") @db.Uuid
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([projectId, createdAt])
+  @@index([createdAt, projectId])
+  @@map("project_events")
+}
+
+enum JobState {
+  QUEUED
+  RUNNING
+  PREVIEW
+  SUCCEEDED
+  FAILED
+  EXPIRED
+}
+
+model ExportJob {
+  id          String             @id @default(uuid()) @db.Uuid
+  ownerId     String             @map("owner_id") @db.Uuid
+  owner       User               @relation(fields: [ownerId], references: [id])
+  kind        String
+  format      String
+  permission  String
+  parameters  Json
+  status      JobState           @default(QUEUED)
+  progress    Int                @default(0)
+  attempts    Int                @default(0)
+  executionId String?            @map("execution_id") @db.Uuid
+  leaseUntil  DateTime?          @map("lease_until")
+  resultKey   String?            @map("result_key")
+  fileName    String?            @map("file_name")
+  mimeType    String?            @map("mime_type")
+  size        Int?
+  errorCode   String?            @map("error_code")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  startedAt   DateTime?          @map("started_at")
+  completedAt DateTime?          @map("completed_at")
+  expiresAt   DateTime?          @map("expires_at")
+  projects    ExportJobProject[]
+
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt])
+  @@index([expiresAt])
+  @@map("export_jobs")
+}
+
+model ExportJobProject {
+  jobId     String    @map("job_id") @db.Uuid
+  projectId String    @map("project_id") @db.Uuid
+  job       ExportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@id([jobId, projectId])
+  @@map("export_job_projects")
+}
+
+model ImportJob {
+  id          String      @id @default(uuid()) @db.Uuid
+  ownerId     String      @map("owner_id") @db.Uuid
+  owner       User        @relation(fields: [ownerId], references: [id])
+  sourceKey   String?     @map("source_key")
+  checksum    String
+  fileName    String      @map("file_name")
+  status      JobState    @default(QUEUED)
+  phase       String      @default("VALIDATE")
+  progress    Int         @default(0)
+  attempts    Int         @default(0)
+  executionId String?     @map("execution_id") @db.Uuid
+  leaseUntil  DateTime?   @map("lease_until")
+  resultKey   String?     @map("result_key")
+  errorCode   String?     @map("error_code")
+  counts      Json        @default("{}")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  startedAt   DateTime?   @map("started_at")
+  completedAt DateTime?   @map("completed_at")
+  expiresAt   DateTime    @map("expires_at")
+  rows        ImportRow[]
+
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt])
+  @@index([expiresAt])
+  @@map("import_jobs")
+}
+
+model ImportRow {
+  position    Int       @default(0)
+  id          String    @id @default(uuid()) @db.Uuid
+  jobId       String    @map("job_id") @db.Uuid
+  job         ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sheet       String
+  rowNumber   Int       @map("row_number")
+  key         String
+  data        Json
+  action      String
+  result      String    @default("PENDING")
+  errors      Json      @default("[]")
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([jobId, sheet, rowNumber])
+  @@index([jobId, processedAt])
+  @@map("import_rows")
+}
+
+enum IntegrationSource {
+  LMS
+  WEBSITE
+}
+
+enum SyncTrigger {
+  MANUAL
+  SCHEDULED
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model IntegrationSyncRun {
+  id            String            @id @default(uuid()) @db.Uuid
+  source        IntegrationSource
+  trigger       SyncTrigger
+  initiatorId   String?           @map("initiator_id") @db.Uuid
+  initiator     User?             @relation(fields: [initiatorId], references: [id], onDelete: SetNull)
+  status        SyncStatus        @default(QUEUED)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  startedAt     DateTime?         @map("started_at")
+  completedAt   DateTime?         @map("completed_at")
+  attempts      Int               @default(0)
+  nextAttemptAt DateTime          @default(now()) @map("next_attempt_at")
+  errorCode     String?           @map("error_code")
+  executionId   String?           @map("execution_id") @db.Uuid
+  leaseUntil    DateTime?         @map("lease_until")
+  deliveredAt   DateTime?         @map("delivered_at")
+  scheduledAt   DateTime?         @map("scheduled_at")
+
+  @@unique([source, scheduledAt])
+  @@index([source, createdAt, id])
+  @@index([status, nextAttemptAt, leaseUntil])
+  @@map("integration_sync_runs")
+}
+
+// Explicit grants replace assignments only for SELECTED KAM policies.
+enum VisibilityMode {
+  ASSIGNED
+  ALL
+  SELECTED
+}
+
+model KamVisibleUniversity {
+  userId       String     @map("user_id") @db.Uuid
+  universityId String     @map("university_id") @db.Uuid
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, universityId])
+  @@map("kam_visible_universities")
+}
+
+model KamVisibleProject {
+  userId    String  @map("user_id") @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@map("kam_visible_projects")
 }
