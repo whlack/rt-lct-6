@@ -4,12 +4,15 @@ import { KeycloakDirectoryAdapter } from '../../../integrations/keycloak/directo
 test('exact email search follows pagination and keeps ambiguous enabled matches', async () => {
   const original = globalThis.fetch;
   const previousAdmin = process.env.KEYCLOAK_SERVICE_CLIENT_ID,
-    previousPassword = process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
+    previousPassword = process.env.KEYCLOAK_SERVICE_CLIENT_SECRET,
+    previousRealm = process.env.KEYCLOAK_REALM;
   process.env.KEYCLOAK_SERVICE_CLIENT_ID = 'fixture';
   process.env.KEYCLOAK_SERVICE_CLIENT_SECRET = 'fixture';
+  process.env.KEYCLOAK_REALM = 'hackathon';
   const firstValues: string[] = [];
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
+    assert.ok(url.pathname.includes('/realms/hackathon/'));
     if (url.pathname.endsWith('/token')) {
       assert.ok(!url.pathname.includes('/master/'));
       assert.equal(
@@ -50,6 +53,8 @@ test('exact email search follows pagination and keeps ambiguous enabled matches'
     if (previousPassword === undefined)
       delete process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
     else process.env.KEYCLOAK_SERVICE_CLIENT_SECRET = previousPassword;
+    if (previousRealm === undefined) delete process.env.KEYCLOAK_REALM;
+    else process.env.KEYCLOAK_REALM = previousRealm;
   }
 });
 

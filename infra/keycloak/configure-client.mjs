@@ -5,6 +5,7 @@ const username = process.env.KEYCLOAK_ADMIN;
 const password = process.env.KEYCLOAK_ADMIN_PASSWORD;
 const directoryId = process.env.KEYCLOAK_SERVICE_CLIENT_ID ?? 'crm-directory';
 const directorySecret = process.env.KEYCLOAK_SERVICE_CLIENT_SECRET;
+const realm = process.env.KEYCLOAK_REALM ?? 'crm';
 
 if (
   !server ||
@@ -13,6 +14,9 @@ if (
   !username ||
   !password ||
   !directorySecret ||
+  !realm ||
+  realm.trim() !== realm ||
+  realm.includes('/') ||
   directoryId === clientId
 ) {
   throw new Error('Keycloak client configuration is incomplete');
@@ -29,6 +33,7 @@ async function request(url, options = {}) {
 }
 
 async function configure() {
+  const realmAdminUrl = `${server}/admin/realms/${encodeURIComponent(realm)}`;
   const tokenResponse = await request(
     `${server}/realms/master/protocol/openid-connect/token`,
     {
@@ -52,7 +57,7 @@ async function configure() {
     'content-type': 'application/json',
   };
   const listResponse = await request(
-    `${server}/admin/realms/crm/clients?clientId=${encodeURIComponent(clientId)}`,
+    `${realmAdminUrl}/clients?clientId=${encodeURIComponent(clientId)}`,
     { headers },
   );
   if (!listResponse.ok)
@@ -77,8 +82,8 @@ async function configure() {
     },
   };
   const url = existing?.id
-    ? `${server}/admin/realms/crm/clients/${existing.id}`
-    : `${server}/admin/realms/crm/clients`;
+    ? `${realmAdminUrl}/clients/${existing.id}`
+    : `${realmAdminUrl}/clients`;
   const response = await request(url, {
     method: existing?.id ? 'PUT' : 'POST',
     headers,
@@ -88,7 +93,7 @@ async function configure() {
     throw new Error(`Keycloak client configuration failed: ${response.status}`);
   // Administrative credentials are used only by this one-shot bootstrap container.
   const directoryList = await request(
-    `${server}/admin/realms/crm/clients?clientId=${encodeURIComponent(directoryId)}`,
+    `${realmAdminUrl}/clients?clientId=${encodeURIComponent(directoryId)}`,
     { headers },
   );
   const directoryClients = await directoryList.json();
@@ -110,7 +115,7 @@ async function configure() {
     webOrigins: [],
   };
   await request(
-    `${server}/admin/realms/crm/clients${existingDirectory ? '/' + existingDirectory.id : ''}`,
+    `${realmAdminUrl}/clients${existingDirectory ? '/' + existingDirectory.id : ''}`,
     {
       method: existingDirectory ? 'PUT' : 'POST',
       headers,
@@ -120,27 +125,26 @@ async function configure() {
   const service = (
     await (
       await request(
-        `${server}/admin/realms/crm/clients?clientId=${encodeURIComponent(directoryId)}`,
+        `${realmAdminUrl}/clients?clientId=${encodeURIComponent(directoryId)}`,
         { headers },
       )
     ).json()
   ).find((item) => item.clientId === directoryId);
   const management = (
     await (
-      await request(
-        `${server}/admin/realms/crm/clients?clientId=realm-management`,
-        { headers },
-      )
+      await request(`${realmAdminUrl}/clients?clientId=realm-management`, {
+        headers,
+      })
     ).json()
   )[0];
   const serviceUser = await (
     await request(
-      `${server}/admin/realms/crm/clients/${service.id}/service-account-user`,
+      `${realmAdminUrl}/clients/${service.id}/service-account-user`,
       { headers },
     )
   ).json();
   const roles = await (
-    await request(`${server}/admin/realms/crm/clients/${management.id}/roles`, {
+    await request(`${realmAdminUrl}/clients/${management.id}/roles`, {
       headers,
     })
   ).json();
@@ -153,7 +157,7 @@ async function configure() {
     `users/${serviceUser.id}/role-mappings/clients/${management.id}`,
     `clients/${service.id}/scope-mappings/clients/${management.id}`,
   ]) {
-    const url = `${server}/admin/realms/crm/${mapping}`;
+    const url = `${realmAdminUrl}/${mapping}`;
     const previous = await (await request(url, { headers })).json();
     const extra = previous.filter(
       (role) => !allowed.some((item) => item.id === role.id),

@@ -6,11 +6,13 @@ const accounts = [
 ];
 const marker = 'rt-crm.local-demo';
 const base = process.env.KEYCLOAK_INTERNAL_URL;
+const realm = process.env.KEYCLOAK_REALM ?? 'crm';
 
 if (
   process.env.LOCAL_DEMO_USERS_SEED !== '1' ||
   process.env.NODE_ENV !== 'development' ||
   !base ||
+  realm !== 'crm' ||
   new URL(base).hostname !== 'keycloak'
 ) {
   throw new Error(
@@ -40,11 +42,14 @@ const headers = {
 };
 
 async function request(path, options = {}) {
-  const response = await fetch(`${base}/admin/realms/crm${path}`, {
-    ...options,
-    headers,
-    signal: AbortSignal.timeout(10_000),
-  });
+  const response = await fetch(
+    `${base}/admin/realms/${encodeURIComponent(realm)}${path}`,
+    {
+      ...options,
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
   if (!response.ok)
     throw new Error(`Keycloak setup ${path} failed: ${response.status}`);
   return response;
