@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+import { keycloakRealmPath } from '../../config/keycloak.js';
 
 export interface RealmPayload extends JWTPayload {
   azp?: string;
@@ -12,9 +13,10 @@ export interface RealmPayload extends JWTPayload {
 export class KeycloakTokenAdapter {
   private readonly publicUrl = process.env.KEYCLOAK_PUBLIC_URL;
   private readonly clientId = process.env.KEYCLOAK_CLIENT_ID ?? 'crm-web';
+  private readonly realmPath = keycloakRealmPath();
   private readonly jwks = createRemoteJWKSet(
     new URL(
-      `${process.env.KEYCLOAK_INTERNAL_URL ?? 'http://keycloak:8080'}/realms/crm/protocol/openid-connect/certs`,
+      `${process.env.KEYCLOAK_INTERNAL_URL ?? 'http://keycloak:8080'}/realms/${this.realmPath}/protocol/openid-connect/certs`,
     ),
   );
 
@@ -24,7 +26,7 @@ export class KeycloakTokenAdapter {
     }
     try {
       const { payload } = await jwtVerify(token, this.jwks, {
-        issuer: `${this.publicUrl}/realms/crm`,
+        issuer: `${this.publicUrl}/realms/${this.realmPath}`,
       });
       if (payload.azp !== this.clientId || typeof payload.sub !== 'string') {
         throw new UnauthorizedException('Invalid token client or subject');

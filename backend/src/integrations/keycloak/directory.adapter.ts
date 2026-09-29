@@ -1,4 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { keycloakRealmPath } from '../../config/keycloak.js';
 
 export interface Employee {
   subject: string;
@@ -34,6 +35,7 @@ function isAdminUser(value: unknown): value is AdminUser {
 export class KeycloakDirectoryAdapter {
   private readonly base =
     process.env.KEYCLOAK_INTERNAL_URL ?? 'http://keycloak:8080';
+  private readonly realmPath = keycloakRealmPath();
 
   async findEmail(email: string): Promise<Employee[]> {
     const token = await this.serviceToken();
@@ -46,7 +48,7 @@ export class KeycloakDirectoryAdapter {
         max: '100',
       });
       const response = await fetch(
-        `${this.base}/admin/realms/crm/users?${query}`,
+        `${this.base}/admin/realms/${this.realmPath}/users?${query}`,
         {
           headers: { authorization: `Bearer ${token}` },
           signal: AbortSignal.timeout(10000),
@@ -86,11 +88,11 @@ export class KeycloakDirectoryAdapter {
     const headers = { authorization: `Bearer ${token}` };
     const [profile, mappings] = await Promise.all([
       fetch(
-        `${this.base}/admin/realms/crm/users/${encodeURIComponent(subject)}`,
+        `${this.base}/admin/realms/${this.realmPath}/users/${encodeURIComponent(subject)}`,
         { headers, signal: AbortSignal.timeout(10000) },
       ),
       fetch(
-        `${this.base}/admin/realms/crm/users/${encodeURIComponent(subject)}/role-mappings/realm/composite`,
+        `${this.base}/admin/realms/${this.realmPath}/users/${encodeURIComponent(subject)}/role-mappings/realm/composite`,
         { headers, signal: AbortSignal.timeout(10000) },
       ),
     ]);
@@ -120,7 +122,7 @@ export class KeycloakDirectoryAdapter {
     if (!secret)
       throw new Error('Keycloak directory service secret is required');
     const response = await fetch(
-      `${this.base}/realms/crm/protocol/openid-connect/token`,
+      `${this.base}/realms/${this.realmPath}/protocol/openid-connect/token`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -153,7 +155,7 @@ export class KeycloakDirectoryAdapter {
       const people = new Map<string, Employee>();
       for (let first = 0; first < 100000; first += 100) {
         const response = await fetch(
-          `${this.base}/admin/realms/crm/roles/${role}/users?first=${first}&max=100`,
+          `${this.base}/admin/realms/${this.realmPath}/roles/${role}/users?first=${first}&max=100`,
           {
             headers: { authorization: `Bearer ${token}` },
             signal: AbortSignal.timeout(10000),

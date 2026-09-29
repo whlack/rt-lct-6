@@ -3,6 +3,7 @@ import type {
   ReferenceObject,
   SchemaObject,
 } from '@nestjs/swagger';
+import { keycloakRealm } from '../config/keycloak.js';
 
 // Общий словарь только поясняет повторяющиеся поля; правила и ограничения остаются в DTO/операциях.
 const descriptions: Record<string, string> = {
@@ -155,7 +156,7 @@ const examples: Record<string, unknown> = {
   timezone: 'Europe/Moscow',
   month: '2026-01',
   url: 'http://localhost:8080',
-  realm: 'crm',
+  realm: keycloakRealm(),
   clientId: 'crm-web',
   fileName: 'test-document.pdf',
   mimeType: 'application/pdf',
