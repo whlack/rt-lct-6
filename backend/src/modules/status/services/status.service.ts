@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../../database/database.service.js';
+import { keycloakRealm } from '../../../config/keycloak.js';
 
 @Injectable()
 export class StatusService {
@@ -13,7 +14,7 @@ export class StatusService {
     return {
       keycloak: {
         url: process.env.KEYCLOAK_PUBLIC_URL ?? 'http://localhost:8080',
-        realm: 'crm',
+        realm: keycloakRealm(),
         clientId: process.env.KEYCLOAK_CLIENT_ID ?? 'crm-web',
       },
     };

@@ -44,3 +44,15 @@ test('browser configuration is an allowlist and contains no service credentials'
   ]);
   assert.equal(service.publicConfig().keycloak.realm, 'crm');
 });
+
+test('browser configuration uses the configured Keycloak realm', () => {
+  const previous = process.env.KEYCLOAK_REALM;
+  process.env.KEYCLOAK_REALM = 'hackathon';
+  try {
+    const service = new StatusService({ isReady: async () => true });
+    assert.equal(service.publicConfig().keycloak.realm, 'hackathon');
+  } finally {
+    if (previous === undefined) delete process.env.KEYCLOAK_REALM;
+    else process.env.KEYCLOAK_REALM = previous;
+  }
+});
